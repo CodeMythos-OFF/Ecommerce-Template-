@@ -11,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
 const AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET;
+const ADMIN_EMAIL = 'codemythos@outlook.com';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
@@ -56,6 +57,7 @@ const createSessionToken = (user) => {
     email: user.email,
     name: user.name,
     picture: user.picture || null,
+    isAdmin: user.email?.toLowerCase() === ADMIN_EMAIL,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
   };
@@ -293,16 +295,22 @@ const initializeData = async () => {
       console.log('📊 Stats initialized');
     }
 
-    const superAdmin = await Seller.findOne({ email: 'rohan.sivaa@gmail.com' });
+    const superAdmin = await Seller.findOne({ email: ADMIN_EMAIL });
     if (!superAdmin) {
       await Seller.create({
-        email: 'rohan.sivaa@gmail.com',
-        name: 'Rohan',
+        email: ADMIN_EMAIL,
+        name: 'CodeMythos',
         businessName: 'ShopMaster',
         isApproved: true,
         isSuperAdmin: true
       });
-      console.log('👑 Super admin seller initialized');
+      console.log('👑 Super admin seller initialized for CodeMythos');
+    } else if (!superAdmin.isSuperAdmin || !superAdmin.isApproved) {
+      superAdmin.isSuperAdmin = true;
+      superAdmin.isApproved = true;
+      superAdmin.updatedAt = new Date();
+      await superAdmin.save();
+      console.log('👑 CodeMythos seller promoted to super admin');
     }
 
     const count = await Product.countDocuments();
@@ -472,6 +480,7 @@ app.post('/api/auth/google/verify', async (req, res) => {
       email: payload.email,
       name: payload.name || payload.email.split('@')[0],
       picture: payload.picture || null,
+      isAdmin: payload.email.toLowerCase() === ADMIN_EMAIL,
     };
 
     setAuthCookie(res, createSessionToken(user));
@@ -498,6 +507,7 @@ app.get('/api/auth/me', (req, res) => {
       email: user.email,
       name: user.name,
       picture: user.picture || null,
+      isAdmin: user.isAdmin === true,
     },
   });
 });
