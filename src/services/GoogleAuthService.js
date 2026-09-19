@@ -2,9 +2,7 @@
  * GoogleAuthService - production Google Identity Services integration.
  * Google returns an ID token to the browser; the backend verifies it.
  */
-const GOOGLE_CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
 
 class GoogleAuthService {
   constructor() {
