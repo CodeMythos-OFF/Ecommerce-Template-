@@ -15,7 +15,7 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:3000',
     'https://scs577738.vercel.app',
-    'https://testsampleindev.vercel.app/'
+    'https://testsampleindev.vercel.app'
   ],
   credentials: true
 }));
