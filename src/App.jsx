@@ -3,6 +3,8 @@ import Navigation from "./Navigation";
 import Auth from "./Auth";
 import AdminPanel from "./AdminPanel";
 import OrderHistory from "./OrderHistory";
+import PrivacyPolicy from "./PrivacyPolicy";
+import TermsOfService from "./TermsOfService";
 import "./App.css";
 import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./cartService";
 import { trackView, createOrder, getProducts } from "./api";
@@ -20,6 +22,8 @@ const ROUTES = {
   "#p": "p",
   "#pdetails": "pdetails",
   "#login": "login",
+  "#privacy": "privacy",
+  "#terms": "terms",
 };
 
 const resolveRoute = (hash) => ROUTES[hash] || "home";
@@ -1300,6 +1304,24 @@ function App() {
           </div>
         </div>
       </div>
+
+      <div id="privacy" className={`page ${activePage === "privacy" ? "active" : ""}`}>
+        <PrivacyPolicy />
+      </div>
+
+      <div id="terms" className={`page ${activePage === "terms" ? "active" : ""}`}>
+        <TermsOfService />
+      </div>
+
+      <footer className="site-footer">
+        <div className="container d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div className="small">© {new Date().getFullYear()} ShopMaster. All rights reserved.</div>
+          <div className="d-flex gap-3">
+            <a href="#privacy" onClick={(e) => { e.preventDefault(); handlePageChange("privacy"); }}>Privacy Policy</a>
+            <a href="#terms" onClick={(e) => { e.preventDefault(); handlePageChange("terms"); }}>Terms of Service</a>
+          </div>
+        </div>
+      </footer>
 
       <div id="orderhistory" className={`page ${activePage === "orderhistory" ? "active" : ""}`}>
         {currentUser ? (
