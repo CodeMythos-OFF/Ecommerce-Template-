@@ -2,11 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
+const AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET;
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
 app.use(cors({
@@ -20,6 +25,84 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+
+// ========== AUTHENTICATION HELPERS ==========
+
+const createSessionToken = (user) => {
+  if (!AUTH_SESSION_SECRET || AUTH_SESSION_SECRET.length < 32) {
+    throw new Error('AUTH_SESSION_SECRET must be configured with at least 32 characters');
+  }
+
+  const payload = {
+    sub: user.sub,
+    provider: 'google',
+    email: user.email,
+    name: user.name,
+    picture: user.picture || null,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+  };
+
+  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', AUTH_SESSION_SECRET)
+    .update(encoded)
+    .digest('base64url');
+
+  return `${encoded}.${signature}`;
+};
+
+const verifySessionToken = (token) => {
+  if (!token || !AUTH_SESSION_SECRET) return null;
+
+  const [encoded, signature] = token.split('.');
+  if (!encoded || !signature) return null;
+
+  const expected = crypto.createHmac('sha256', AUTH_SESSION_SECRET)
+    .update(encoded)
+    .digest('base64url');
+
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    return payload.exp > Math.floor(Date.now() / 1000) ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseCookies = (req) => {
+  const header = req.headers.cookie || '';
+  return header.split(';').reduce((cookies, part) => {
+    const i = part.indexOf('=');
+    if (i > 0) cookies[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+    return cookies;
+  }, {});
+};
+
+const setAuthCookie = (res, token) => {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax${secure}`
+  );
+};
+
+const clearAuthCookie = (res) => {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secure}`
+  );
+};
+
+const getSessionUser = (req) => {
+  const token = parseCookies(req).shopmaster_session;
+  return verifySessionToken(token);
+};
 
 // MongoDB Connection with proper error handling
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -319,52 +402,63 @@ app.get('/api/health', (req, res) => {
 
 // ========== AUTHENTICATION ROUTES ==========
 
-/**
- * Google OAuth 2.0 Token Exchange
- * Exchanges authorization code for ID token and user info
- * This is called by the backend to securely exchange the code
- */
-app.post('/api/auth/google/callback', async (req, res) => {
+app.post('/api/auth/google/verify', async (req, res) => {
   try {
-    const { code, state } = req.body;
+    const { credential } = req.body;
 
-    if (!code || !state) {
-      return res.status(400).json({ 
-        error: 'Missing required parameters: code and state' 
-      });
+    if (!credential || typeof credential !== 'string') {
+      return res.status(400).json({ success: false, error: 'Google credential is required' });
     }
 
-    // IMPORTANT: In production, verify the state against a stored value
-    // and exchange the code for tokens via Google's token endpoint
-    // This requires your Google OAuth client secret (keep it server-side only!)
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID,
+    });
 
-    // For now, we'll return a mock response
-    // In production, implement actual Google token exchange here
+    const payload = ticket.getPayload();
 
-    const mockUserData = {
+    if (!payload?.sub || !payload?.email || payload.email_verified !== true) {
+      return res.status(401).json({ success: false, error: 'Google account could not be verified' });
+    }
+
+    const user = {
       provider: 'google',
-      email: 'user@example.com',
-      name: 'User Name',
-      picture: 'https://via.placeholder.com/80',
-      sub: 'google-user-id',
-      loginTime: new Date().toISOString(),
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name || payload.email.split('@')[0],
+      picture: payload.picture || null,
     };
 
-    // In production:
-    // 1. Verify state
-    // 2. Exchange code for tokens using Google's OAuth endpoint
-    // 3. Extract user info from ID token
-    // 4. Create/update user in database if needed
-
-    res.json({
-      success: true,
-      user: mockUserData,
-      token: 'mock-jwt-token', // Replace with actual JWT token in production
-    });
+    setAuthCookie(res, createSessionToken(user));
+    return res.json({ success: true, user });
   } catch (error) {
-    console.error('Google OAuth callback error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Google ID token verification failed:', error.message);
+    return res.status(401).json({ success: false, error: 'Invalid Google credential' });
   }
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const user = getSessionUser(req);
+
+  if (!user) {
+    return res.status(401).json({ success: false, error: 'Not authenticated' });
+  }
+
+  return res.json({
+    success: true,
+    user: {
+      provider: user.provider,
+      sub: user.sub,
+      email: user.email,
+      name: user.name,
+      picture: user.picture || null,
+    },
+  });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  clearAuthCookie(res);
+  return res.json({ success: true });
 });
 
 // ========== SELLER ROUTES ==========
