@@ -9,6 +9,8 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleError, setGoogleError] = useState('');
   const googleButtonRef = useRef(null);
 
   const clearUser = () => {
@@ -66,10 +68,20 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
       try {
         await GoogleAuthService.initialize(handleGoogleCredentialResponse);
         if (!cancelled && googleButtonRef.current) {
-          GoogleAuthService.renderButton(googleButtonRef.current, { width: 250 });
+          const rendered = GoogleAuthService.renderButton(googleButtonRef.current, { width: 250 });
+          if (rendered) {
+            setGoogleReady(true);
+            setGoogleError('');
+          } else {
+            throw new Error('Google sign-in button could not be rendered');
+          }
         }
       } catch (error) {
         console.error('Failed to initialize Google Identity Services:', error);
+        if (!cancelled) {
+          setGoogleReady(false);
+          setGoogleError('Google sign-in could not load. Please refresh the page and try again.');
+        }
       }
     };
 
@@ -170,6 +182,14 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
           pointerEvents: isGoogleLoading ? 'none' : 'auto'
         }}
       />
+      {googleError && (
+        <p role="alert" style={{ color: '#b02a37', fontSize: '0.85rem', textAlign: 'center', maxWidth: '320px', margin: 0 }}>
+          {googleError}
+        </p>
+      )}
+      {!googleReady && !googleError && (
+        <p style={{ color: '#666', fontSize: '0.85rem', margin: 0 }}>Loading Google sign-in…</p>
+      )}
 
       <p className="google-auth-disclaimer">
         By signing in, you agree to our Terms of Service and Privacy Policy
