@@ -1155,7 +1155,7 @@ function App() {
                   </div>
                   <div className="mt-4">
                     <p className="small text-muted">
-                      <i className="bi bi-shield-check"></i> Secure sign-in with Google or Microsoft
+                      <i className="bi bi-shield-check"></i> Secure sign-in with Google
                     </p>
                     <p className="small text-muted">Your cart and preferences are saved automatically</p>
                   </div>
