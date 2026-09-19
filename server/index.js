@@ -14,14 +14,23 @@ const AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://scs577738.vercel.app',
+  'https://testsampleindev.vercel.app'
+]);
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://scs577738.vercel.app',
-    'https://testsampleindev.vercel.app'
-  ],
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.has(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS origin not allowed'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -139,8 +148,12 @@ const connectDB = async () => {
     
     isConnected = true;
     console.log('✅ Connected to MongoDB');
-    
-    await initializeData();
+
+    // Initialization is intentionally not awaited here. API requests should
+    // not be blocked by seed/setup work during a Vercel cold start.
+    initializeData().catch((error) => {
+      console.error('❌ Background data initialization error:', error.message);
+    });
   } catch (err) {
     console.error('❌ MongoDB connection error:', err.message);
     isConnected = false;
@@ -389,7 +402,7 @@ const initializeData = async () => {
 };
 
 // Routes
-\n// Ensure every API request has a ready MongoDB connection.
+// Ensure every API request has a ready MongoDB connection.
 // Vercel serverless functions can receive a request before the non-blocking
 // startup connection above has finished, which otherwise causes intermittent
 // 500 errors on stats/orders during cold starts.
