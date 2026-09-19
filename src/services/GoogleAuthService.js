@@ -4,7 +4,7 @@
  * Supports both popup flow and direct callback flow
  */
 
-const GOOGLE_CLIENT_ID = '441853028836-o65ton6djcjdvkdk2n2kpstdj930e4r6.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
 
 class GoogleAuthService {
   constructor() {
