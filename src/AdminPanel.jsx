@@ -577,7 +577,7 @@ const AdminPanel = () => {
                               <strong>Email:</strong> {order.user || 'N/A'}
                             </p>
                             <p className="mb-1">
-                              <strong>Phone:</strong> {order.phone || 'N/A'}
+                              <strong>Phone:</strong> {order.address?.phone || order.phone || 'N/A'}
                             </p>
                           </div>
 
