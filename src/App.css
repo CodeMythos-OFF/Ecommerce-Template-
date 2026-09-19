@@ -1092,3 +1092,98 @@
 .review-form textarea {
   resize: none;
 }
+
+/* ===== Legal Pages & Site Footer ===== */
+.legal-page {
+  min-height: calc(100vh - 120px);
+  background: linear-gradient(180deg, #f7f9fc 0%, #ffffff 100%);
+  padding: 1px 0;
+}
+
+.legal-card {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 3rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 10px 35px rgba(15, 23, 42, 0.07);
+}
+
+.legal-eyebrow {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  color: #c7511f;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.legal-card h1 {
+  margin-bottom: 0.35rem;
+  color: #232f3e;
+  font-weight: 800;
+}
+
+.legal-updated {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.legal-card h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.65rem;
+  color: #232f3e;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.legal-card p,
+.legal-card li {
+  color: #4b5563;
+  line-height: 1.75;
+}
+
+.legal-card ul {
+  padding-left: 1.4rem;
+}
+
+.site-footer {
+  margin-top: 3rem;
+  padding: 1.5rem 0;
+  background: #232f3e;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.site-footer a {
+  color: #ffd814;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.site-footer a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+@media (max-width: 576px) {
+  .legal-card {
+    margin: 1rem 0;
+    padding: 1.5rem;
+    border-radius: 12px;
+  }
+
+  .legal-card h1 {
+    font-size: 1.8rem;
+  }
+
+  .legal-card h2 {
+    font-size: 1.05rem;
+  }
+
+  .site-footer .container {
+    justify-content: center !important;
+    text-align: center;
+  }
+}
