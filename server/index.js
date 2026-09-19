@@ -11,7 +11,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
 const AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET;
-const ADMIN_EMAIL = 'codemythos@outlook.com';
+const ADMIN_EMAILS = [
+  'codemythos@outlook.com',
+  // Add more admin email addresses here.
+].map((email) => email.toLowerCase());
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
@@ -57,7 +60,7 @@ const createSessionToken = (user) => {
     email: user.email,
     name: user.name,
     picture: user.picture || null,
-    isAdmin: user.email?.toLowerCase() === ADMIN_EMAIL,
+    isAdmin: ADMIN_EMAILS.includes(user.email?.toLowerCase()),
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
   };
@@ -295,10 +298,10 @@ const initializeData = async () => {
       console.log('📊 Stats initialized');
     }
 
-    const superAdmin = await Seller.findOne({ email: ADMIN_EMAIL });
+    const superAdmin = await Seller.findOne({ email: ADMIN_EMAILS[0] });
     if (!superAdmin) {
       await Seller.create({
-        email: ADMIN_EMAIL,
+        email: ADMIN_EMAILS[0],
         name: 'CodeMythos',
         businessName: 'ShopMaster',
         isApproved: true,
@@ -480,7 +483,7 @@ app.post('/api/auth/google/verify', async (req, res) => {
       email: payload.email,
       name: payload.name || payload.email.split('@')[0],
       picture: payload.picture || null,
-      isAdmin: payload.email.toLowerCase() === ADMIN_EMAIL,
+      isAdmin: ADMIN_EMAILS.includes(payload.email.toLowerCase()),
     };
 
     setAuthCookie(res, createSessionToken(user));
