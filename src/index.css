@@ -1,0 +1,41 @@
+
+#Cart {
+    padding: 20px;
+    background-color: #fcfcfc;
+    height: 850px;
+}
+.cart-items {
+    margin-top: 20px;
+    background-color: white;
+    min-height: 400px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    width: 750px;
+    margin-left: 150px;
+
+}
+.font-roboto { font-family: 'Roboto', sans-serif !important; }
+.font-serif  { font-family: serif !important; }
+.review-star-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.3rem;
+  color: #cfcfcf;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.review-star-btn.active,
+.review-star-btn:hover {
+  color: #f2b90d;
+}
+
+.review-star-btn:focus-visible {
+  outline: 2px solid #f2b90d;
+  outline-offset: 2px;
+}
+
+.review-form textarea {
+  resize: none;
+}
