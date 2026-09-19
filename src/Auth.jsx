@@ -158,6 +158,8 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
   }, [clearUser]);
 
   const handleSignOut = async () => {
+    setIsGoogleLoading(true);
+
     try {
       await fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
@@ -171,6 +173,8 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
     clearUser();
     setIsLoading(false);
     setIsGoogleLoading(false);
+    setGoogleError('');
+    setGoogleReady(true);
   };
 
   if (isSignedIn && userInfo) {
