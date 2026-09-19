@@ -12,9 +12,11 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
   const [googleReady, setGoogleReady] = useState(false);
   const [googleError, setGoogleError] = useState('');
   const googleButtonRef = useRef(null);
+  const googleButtonRenderedRef = useRef(false);
 
   const clearUser = useCallback(() => {
     sessionStorage.removeItem('authUser');
+    googleButtonRenderedRef.current = false;
     setUserInfo(null);
     setIsSignedIn(false);
     window.dispatchEvent(new Event('userChanged'));
@@ -63,8 +65,7 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
     }
   }, [applyUser, clearUser, onSignInFailure]);
 
-  // Initialize Google independently from session restoration.
-  // This prevents /auth/me (401 when signed out) from hiding the button.
+  // Initialize Google once and render its button only once per mount.
   useEffect(() => {
     let cancelled = false;
 
@@ -72,90 +73,30 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
       try {
         setGoogleError('');
         await GoogleAuthService.initialize(handleGoogleCredentialResponse);
-
         if (cancelled) return;
-
         setGoogleReady(true);
 
-        // The container is rendered regardless of the session-check state.
-        // Give React one paint before asking GIS to render into it.
         requestAnimationFrame(() => {
-          if (!cancelled && googleButtonRef.current) {
-            const rendered = GoogleAuthService.renderButton(
-              googleButtonRef.current,
-              { width: 250 }
-            );
-
-            if (!rendered) {
-              setGoogleError('Google Sign-In could not be rendered. Please refresh the page.');
-            }
+          if (cancelled || !googleButtonRef.current || googleButtonRenderedRef.current) return;
+          const rendered = GoogleAuthService.renderButton(googleButtonRef.current, { width: 250 });
+          if (rendered) {
+            googleButtonRenderedRef.current = true;
+          } else {
+            setGoogleError('Google Sign-In could not be rendered. Please refresh the page.');
           }
         });
       } catch (error) {
-        if (cancelled) return;
-        console.error('Failed to initialize Google Identity Services:', error);
-        setGoogleError(error.message || 'Could not load Google Sign-In.');
+        if (!cancelled) {
+          console.error('Failed to initialize Google Identity Services:', error);
+          setGoogleError(error.message || 'Could not load Google Sign-In.');
+        }
       }
     };
 
     initializeGoogle();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [handleGoogleCredentialResponse]);
 
-  // If Google becomes ready after a re-render, make sure the button is mounted.
-  useEffect(() => {
-    if (!googleReady || !googleButtonRef.current) return;
-
-    const rendered = GoogleAuthService.renderButton(
-      googleButtonRef.current,
-      { width: 250 }
-    );
-
-    if (!rendered) {
-      setGoogleError('Google Sign-In could not be rendered. Please refresh the page.');
-    }
-  }, [googleReady]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const restoreSession = async () => {
-      try {
-        const response = await fetch(`${API_URL}/auth/me`, {
-          credentials: 'include',
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (cancelled) return;
-
-        if (response.ok && data.success && data.user) {
-          setUserInfo(data.user);
-          setIsSignedIn(true);
-          sessionStorage.setItem('authUser', JSON.stringify(data.user));
-        } else {
-          // 401 simply means there is no existing session.
-          clearUser();
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.warn('Could not restore authentication session:', error);
-          clearUser();
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    restoreSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clearUser]);
 
   const handleSignOut = async () => {
     setIsGoogleLoading(true);
