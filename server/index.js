@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
 const AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET;
 const ADMIN_EMAIL = 'codemythos@outlook.com';
+const ADMIN_EMAIL = 'codemythos@outlook.com';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
