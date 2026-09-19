@@ -389,6 +389,25 @@ const initializeData = async () => {
 };
 
 // Routes
+\n// Ensure every API request has a ready MongoDB connection.
+// Vercel serverless functions can receive a request before the non-blocking
+// startup connection above has finished, which otherwise causes intermittent
+// 500 errors on stats/orders during cold starts.
+app.use('/api', async (req, res, next) => {
+  if (!isConnected) {
+    await connectDB();
+  }
+
+  if (!isConnected) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database is not ready. Please retry shortly.'
+    });
+  }
+
+  next();
+});
+
 
 // Health check
 app.get('/api/health', (req, res) => {
