@@ -407,6 +407,12 @@ const initializeData = async () => {
 // startup connection above has finished, which otherwise causes intermittent
 // 500 errors on stats/orders during cold starts.
 app.use('/api', async (req, res, next) => {
+  // Authentication endpoints use the signed session cookie and Google token;
+  // they do not require MongoDB to answer.
+  if (req.path.startsWith('/auth/')) {
+    return next();
+  }
+
   if (!isConnected) {
     await connectDB();
   }
@@ -473,7 +479,8 @@ app.get('/api/auth/me', (req, res) => {
   const user = getSessionUser(req);
 
   if (!user) {
-    return res.status(401).json({ success: false, error: 'Not authenticated' });
+    // A missing session is a normal signed-out state, not a server error.
+    return res.json({ success: false, authenticated: false, user: null });
   }
 
   return res.json({
