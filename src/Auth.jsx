@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './GoogleAuth.css';
 import GoogleAuthService from './services/GoogleAuthService';
 
@@ -9,24 +9,26 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleError, setGoogleError] = useState('');
   const googleButtonRef = useRef(null);
 
-  const clearUser = () => {
+  const clearUser = useCallback(() => {
     sessionStorage.removeItem('authUser');
     setUserInfo(null);
     setIsSignedIn(false);
     window.dispatchEvent(new Event('userChanged'));
-  };
+  }, []);
 
-  const applyUser = (user) => {
+  const applyUser = useCallback((user) => {
     setUserInfo(user);
     setIsSignedIn(true);
     sessionStorage.setItem('authUser', JSON.stringify(user));
     window.dispatchEvent(new Event('userChanged'));
     onSignInSuccess?.(user);
-  };
+  }, [onSignInSuccess]);
 
-  const handleGoogleCredentialResponse = async (response) => {
+  const handleGoogleCredentialResponse = useCallback(async (response) => {
     if (!response?.credential) {
       setIsGoogleLoading(false);
       onSignInFailure?.(new Error('Google did not return a credential'));
@@ -34,6 +36,7 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
     }
 
     setIsGoogleLoading(true);
+    setGoogleError('');
 
     try {
       const result = await fetch(`${API_URL}/auth/google/verify`, {
@@ -52,32 +55,73 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
     } catch (error) {
       console.error('Google sign-in failed:', error);
       clearUser();
+      setGoogleError(error.message || 'Google sign-in failed');
       onSignInFailure?.(error);
     } finally {
       setIsGoogleLoading(false);
       setIsLoading(false);
     }
-  };
+  }, [applyUser, clearUser, onSignInFailure]);
 
+  // Initialize Google independently from session restoration.
+  // This prevents /auth/me (401 when signed out) from hiding the button.
   useEffect(() => {
     let cancelled = false;
 
     const initializeGoogle = async () => {
       try {
+        setGoogleError('');
         await GoogleAuthService.initialize(handleGoogleCredentialResponse);
-        if (!cancelled && googleButtonRef.current) {
-          GoogleAuthService.renderButton(googleButtonRef.current, { width: 250 });
-        }
+
+        if (cancelled) return;
+
+        setGoogleReady(true);
+
+        // The container is rendered regardless of the session-check state.
+        // Give React one paint before asking GIS to render into it.
+        requestAnimationFrame(() => {
+          if (!cancelled && googleButtonRef.current) {
+            const rendered = GoogleAuthService.renderButton(
+              googleButtonRef.current,
+              { width: 250 }
+            );
+
+            if (!rendered) {
+              setGoogleError('Google Sign-In could not be rendered. Please refresh the page.');
+            }
+          }
+        });
       } catch (error) {
+        if (cancelled) return;
         console.error('Failed to initialize Google Identity Services:', error);
+        setGoogleError(error.message || 'Could not load Google Sign-In.');
       }
     };
 
     initializeGoogle();
-    return () => { cancelled = true; };
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleGoogleCredentialResponse]);
+
+  // If Google becomes ready after a re-render, make sure the button is mounted.
+  useEffect(() => {
+    if (!googleReady || !googleButtonRef.current) return;
+
+    const rendered = GoogleAuthService.renderButton(
+      googleButtonRef.current,
+      { width: 250 }
+    );
+
+    if (!rendered) {
+      setGoogleError('Google Sign-In could not be rendered. Please refresh the page.');
+    }
+  }, [googleReady]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const restoreSession = async () => {
       try {
         const response = await fetch(`${API_URL}/auth/me`, {
@@ -85,24 +129,33 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
         });
 
         const data = await response.json().catch(() => ({}));
+
+        if (cancelled) return;
+
         if (response.ok && data.success && data.user) {
           setUserInfo(data.user);
           setIsSignedIn(true);
           sessionStorage.setItem('authUser', JSON.stringify(data.user));
         } else {
+          // 401 simply means there is no existing session.
           clearUser();
         }
       } catch (error) {
-        console.warn('Could not restore authentication session:', error);
-        clearUser();
+        if (!cancelled) {
+          console.warn('Could not restore authentication session:', error);
+          clearUser();
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     restoreSession();
-  }, []);
 
+    return () => {
+      cancelled = true;
+    };
+  }, [clearUser]);
 
   const handleSignOut = async () => {
     try {
@@ -119,15 +172,6 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
     setIsLoading(false);
     setIsGoogleLoading(false);
   };
-
-  if (isLoading && !isSignedIn) {
-    return (
-      <div className="google-auth-loading">
-        <div className="spinner"></div>
-        <p>Checking your sign-in...</p>
-      </div>
-    );
-  }
 
   if (isSignedIn && userInfo) {
     return (
@@ -146,9 +190,7 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
         <div className="profile-info">
           <h3>{userInfo.name}</h3>
           <p>{userInfo.email}</p>
-          <small className="text-muted">
-            Signed in with Google
-          </small>
+          <small className="text-muted">Signed in with Google</small>
         </div>
         <button onClick={handleSignOut} className="sign-out-button">Sign Out</button>
       </div>
@@ -157,6 +199,13 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
 
   return (
     <div className="google-auth-container">
+      {isLoading && (
+        <div className="google-auth-loading">
+          <div className="spinner"></div>
+          <p>Checking your sign-in...</p>
+        </div>
+      )}
+
       <div
         ref={googleButtonRef}
         aria-label="Sign in with Google"
@@ -170,6 +219,12 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
           pointerEvents: isGoogleLoading ? 'none' : 'auto'
         }}
       />
+
+      {googleError && (
+        <p role="alert" style={{ marginTop: '12px', color: '#dc3545', fontSize: '14px' }}>
+          {googleError}
+        </p>
+      )}
 
       <p className="google-auth-disclaimer">
         By signing in, you agree to our Terms of Service and Privacy Policy
