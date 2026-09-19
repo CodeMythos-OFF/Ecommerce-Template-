@@ -21,6 +21,13 @@ const ALLOWED_ORIGINS = new Set([
   'https://testsampleindev.vercel.app'
 ]);
 
+app.use((req, res, next) => {
+  // Google Identity Services uses window.postMessage for the sign-in popup.
+  // Allow the popup communication without weakening other security headers.
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || ALLOWED_ORIGINS.has(origin)) {
@@ -96,7 +103,7 @@ const setAuthCookie = (res, token) => {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
-    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax${secure}`
+    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=None; Secure`
   );
 };
 
@@ -104,7 +111,7 @@ const clearAuthCookie = (res) => {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
-    `shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secure}`
+    `shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=None; Secure`
   );
 };
 
