@@ -11,8 +11,6 @@ import { trackView, createOrder, getProducts } from "./api";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
 import Swal from "sweetalert2";
 
-const ADMIN_EMAIL = "rohan.sivaa@gmail.com";
-
 const ROUTES = {
   "#dashboard": "dashboard",
   "#orderhistory": "orderhistory",
@@ -284,7 +282,7 @@ function App() {
     const user = getCurrentUser();
     if (user) {
       setCurrentUser(user);
-      setIsAdmin(user.email === ADMIN_EMAIL);
+      setIsAdmin(user.isAdmin === true);
       const savedCart = getCart(user.email);
       setCartItems(savedCart);
     }
@@ -308,7 +306,7 @@ function App() {
     const handleUserChange = () => {
       const user = getCurrentUser();
       setCurrentUser(user);
-      setIsAdmin(user ? user.email === ADMIN_EMAIL : false);
+      setIsAdmin(user ? user.isAdmin === true : false);
       if (user) {
         setCartItems(getCart(user.email));
       } else {
