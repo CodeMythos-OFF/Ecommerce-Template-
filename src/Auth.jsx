@@ -65,6 +65,49 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
     }
   }, [applyUser, clearUser, onSignInFailure]);
 
+  // Restore the server-side session on every mount. If the cookie/session is gone,
+  // clear the cached browser user instead of waiting forever on the loading screen.
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const restoreSession = async () => {
+      try {
+        const result = await fetch(`${API_URL}/auth/me`, {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const data = await result.json().catch(() => ({}));
+
+        if (cancelled) return;
+
+        if (result.ok && data.authenticated && data.user) {
+          applyUser(data.user);
+        } else {
+          clearUser();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Session restore failed:', error);
+          clearUser();
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [applyUser, clearUser]);
   // Initialize Google once and render its button only once per mount.
   useEffect(() => {
     let cancelled = false;
