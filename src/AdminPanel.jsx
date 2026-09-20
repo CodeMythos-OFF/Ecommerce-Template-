@@ -271,7 +271,7 @@ const AdminPanel = ({ currentUser }) => {
 
       setProductLoading(true);
       try {
-        await deleteProduct(productId, pinResult.value);
+        await deleteProduct(productId, pinResult.value, orders.find(() => false)?.sellerEmail);
         Swal.fire({
           icon: 'success',
           title: 'Deleted!',
@@ -608,9 +608,11 @@ const AdminPanel = ({ currentUser }) => {
                               </>
                             )}
                           </button>
-                          <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteOrder(orderId)}>
-                            <i className="bi bi-trash"></i> Delete
-                          </button>
+                          {currentUser?.isSuperAdmin && (
+                            <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteOrder(orderId)}>
+                              <i className="bi bi-trash"></i> Delete
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
