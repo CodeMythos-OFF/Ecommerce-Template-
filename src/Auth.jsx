@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './GoogleAuth.css';
 import GoogleAuthService from './services/GoogleAuthService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://backend-cm-test.vercel.app/api';
+const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
 const Auth = ({ onSignInSuccess, onSignInFailure }) => {
   const [isSignedIn, setIsSignedIn] = useState(false);
