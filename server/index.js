@@ -18,6 +18,8 @@ const ADMIN_EMAILS = [
 
 // Backward-compatible alias for any older code paths that still reference ADMIN_EMAIL.
 const ADMIN_EMAIL = ADMIN_EMAILS[0];
+const SUPER_ADMIN_EMAIL = 'codemythos@outlook.com';
+const SUPER_ADMIN_DELETE_PIN = process.env.SUPER_ADMIN_DELETE_PIN || '2014';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
@@ -131,6 +133,32 @@ const getSessionUser = (req) => {
   return verifySessionToken(bearer || cookieToken);
 };
 
+const getAccessContext = async (req) => {
+  const sessionUser = getSessionUser(req);
+  if (!sessionUser?.email) return null;
+
+  const email = sessionUser.email.toLowerCase();
+  const isSuperAdmin = email === SUPER_ADMIN_EMAIL;
+  const seller = await Seller.findOne({ email }).maxTimeMS(5000);
+  const isSeller = Boolean(seller?.isApproved);
+
+  return { sessionUser, seller, isSuperAdmin, isSeller, canManageProducts: isSuperAdmin || isSeller };
+};
+
+const requireProductManager = async (req, res) => {
+  const access = await getAccessContext(req);
+  if (!access?.canManageProducts) {
+    res.status(403).json({ error: 'Approved seller or super admin access is required' });
+    return null;
+  }
+  return access;
+};
+
+const verifySuperAdminPin = (req) => {
+  const pin = req.headers['x-super-admin-pin'] || req.body?.pin || req.query?.pin;
+  return typeof pin === 'string' && pin === SUPER_ADMIN_DELETE_PIN;
+};
+
 // MongoDB Connection with proper error handling
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -236,6 +264,7 @@ const productSchema = new mongoose.Schema({
   sellerId: { type: String },
   sellerName: { type: String, required: true },
   sellerBusinessName: { type: String, required: true },
+  brand: { type: String },
   stock: { type: Number, default: 100 },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
@@ -486,13 +515,22 @@ app.post('/api/auth/google/verify', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Google account could not be verified' });
     }
 
+    const seller = await Seller.findOne({ email: payload.email.toLowerCase() }).maxTimeMS(5000);
+    const isSuperAdmin = payload.email.toLowerCase() === SUPER_ADMIN_EMAIL;
+    const isSeller = Boolean(seller?.isApproved);
+
     const user = {
       provider: 'google',
       sub: payload.sub,
       email: payload.email,
       name: payload.name || payload.email.split('@')[0],
       picture: payload.picture || null,
-      isAdmin: ADMIN_EMAILS.includes(payload.email.toLowerCase()),
+      isAdmin: isSuperAdmin || isSeller,
+      isSuperAdmin,
+      isSeller,
+      sellerId: seller ? String(seller._id) : null,
+      sellerName: seller?.name || null,
+      sellerBusinessName: seller?.businessName || null,
     };
 
     const sessionToken = createSessionToken(user);
@@ -515,14 +553,23 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({
     success: true,
     authenticated: true,
-    user: {
-      provider: user.provider,
-      sub: user.sub,
-      email: user.email,
-      name: user.name,
-      picture: user.picture || null,
-      isAdmin: user.isAdmin === true,
-    },
+    user: await (async () => {
+      const seller = await Seller.findOne({ email: user.email.toLowerCase() }).maxTimeMS(5000);
+      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL;
+      return {
+        provider: user.provider,
+        sub: user.sub,
+        email: user.email,
+        name: user.name,
+        picture: user.picture || null,
+        isAdmin: isSuperAdmin || Boolean(seller?.isApproved),
+        isSuperAdmin,
+        isSeller: Boolean(seller?.isApproved),
+        sellerId: seller ? String(seller._id) : null,
+        sellerName: seller?.name || null,
+        sellerBusinessName: seller?.businessName || null,
+      };
+    })(),
   });
 });
 
@@ -644,34 +691,37 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   try {
-    const { id, year, cost, img, category, description, sellerEmail } = req.body;
-    
-    const seller = await Seller.findOne({ email: sellerEmail }).maxTimeMS(5000);
-    if (!seller) {
-      return res.status(403).json({ error: 'Seller not registered' });
-    }
-    if (!seller.isApproved) {
+    const access = await requireProductManager(req, res);
+    if (!access) return;
+
+    const { id, year, cost, img, category, description, brand, sellerEmail: requestedSellerEmail } = req.body;
+    const targetEmail = access.isSuperAdmin
+      ? String(requestedSellerEmail || '').toLowerCase()
+      : access.sessionUser.email.toLowerCase();
+
+    if (!targetEmail) return res.status(400).json({ error: 'Seller email is required' });
+
+    const seller = access.isSuperAdmin
+      ? await Seller.findOne({ email: targetEmail }).maxTimeMS(5000)
+      : access.seller;
+
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+    if (!access.isSuperAdmin && !seller.isApproved) {
       return res.status(403).json({ error: 'Seller account pending approval' });
     }
-    
-    const existing = await Product.findOne({ id, sellerEmail }).maxTimeMS(5000);
-    if (existing) {
-      return res.status(400).json({ error: 'You already have a product with this name' });
-    }
-    
+
+    const existing = await Product.findOne({ id, sellerEmail: seller.email }).maxTimeMS(5000);
+    if (existing) return res.status(400).json({ error: 'This seller already has a product with this name' });
+
     const product = await Product.create({
-      id,
-      year,
-      cost,
-      img,
-      category,
-      description,
-      sellerEmail,
+      id, year, cost, img, category, description,
+      brand: String(brand || seller.businessName || '').trim(),
+      sellerEmail: seller.email,
       sellerId: String(seller._id),
       sellerName: seller.name,
       sellerBusinessName: seller.businessName
     });
-    
+
     res.status(201).json(product);
   } catch (error) {
     console.error('Add product error:', error);
@@ -681,24 +731,27 @@ app.post('/api/products', async (req, res) => {
 
 app.put('/api/products/:id', async (req, res) => {
   try {
-    const { year, cost, img, category, description, sellerEmail, stock, isActive } = req.body;
-    
-    const product = await Product.findOne({ id: req.params.id, sellerEmail }).maxTimeMS(5000);
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found or you do not have permission to edit it' });
-    }
-    
+    const access = await requireProductManager(req, res);
+    if (!access) return;
+
+    const { year, cost, img, category, description, brand, stock, isActive } = req.body;
+    const filter = { id: req.params.id };
+    if (!access.isSuperAdmin) filter.sellerEmail = access.seller.email;
+
+    const product = await Product.findOne(filter).maxTimeMS(5000);
+    if (!product) return res.status(404).json({ error: 'Product not found or you do not have permission to edit it' });
+
     product.year = year || product.year;
     product.cost = cost !== undefined ? cost : product.cost;
     product.img = img || product.img;
     product.category = category || product.category;
     product.description = description || product.description;
+    product.brand = brand !== undefined ? String(brand).trim() : (product.brand || product.sellerBusinessName);
     product.stock = stock !== undefined ? stock : product.stock;
     product.isActive = isActive !== undefined ? isActive : product.isActive;
     product.updatedAt = new Date();
-    
+
     await product.save();
-    
     res.json(product);
   } catch (error) {
     console.error('Update product error:', error);
@@ -708,14 +761,19 @@ app.put('/api/products/:id', async (req, res) => {
 
 app.delete('/api/products/:id', async (req, res) => {
   try {
-    const { sellerEmail } = req.query;
-    
-    const product = await Product.findOneAndDelete({ id: req.params.id, sellerEmail }).maxTimeMS(5000);
-    
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found or you do not have permission to delete it' });
+    const access = await requireProductManager(req, res);
+    if (!access) return;
+
+    if (!access.isSuperAdmin) {
+      return res.status(403).json({ error: 'Only the super admin can delete products' });
     }
-    
+    if (!verifySuperAdminPin(req)) {
+      return res.status(403).json({ error: 'A valid super admin PIN is required' });
+    }
+
+    const product = await Product.findOneAndDelete({ id: req.params.id }).maxTimeMS(5000);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
     res.json({ message: 'Product deleted successfully', product });
   } catch (error) {
     console.error('Delete product error:', error);
@@ -900,24 +958,25 @@ app.get('/api/orders/:id', async (req, res) => {
 // Delete order permanently from MongoDB
 app.delete('/api/orders/:id', async (req, res) => {
   try {
-    const order = await Order.findByIdAndDelete(req.params.id).maxTimeMS(5000);
-    
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Only the super admin can delete orders' });
     }
-    
-    // Update stats - decrease total orders count
+    if (!verifySuperAdminPin(req)) {
+      return res.status(403).json({ error: 'A valid super admin PIN is required' });
+    }
+
+    const order = await Order.findByIdAndDelete(req.params.id).maxTimeMS(5000);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
     let stats = await Stats.findOne().maxTimeMS(5000);
     if (stats && stats.totalOrders > 0) {
       stats.totalOrders -= 1;
       stats.updatedAt = new Date();
       await stats.save();
     }
-    
-    res.json({ 
-      message: 'Order deleted permanently from database', 
-      deletedOrder: order 
-    });
+
+    res.json({ message: 'Order deleted permanently from database', deletedOrder: order });
   } catch (error) {
     console.error('Delete order error:', error);
     res.status(500).json({ error: error.message });
@@ -927,6 +986,11 @@ app.delete('/api/orders/:id', async (req, res) => {
 // Update order status
 app.put('/api/orders/:orderId/status', async (req, res) => {
   try {
+    const access = await getAccessContext(req);
+    if (!access?.canManageProducts) {
+      return res.status(403).json({ error: 'Approved seller or super admin access is required' });
+    }
+
     const { orderId } = req.params;
     const { status } = req.body;
 
