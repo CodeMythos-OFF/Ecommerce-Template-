@@ -9,7 +9,9 @@ import {
   updateProduct,
   deleteProduct,
   deleteOrder,
-  updateOrderStatus
+  updateOrderStatus,
+  approveSeller,
+  revokeSeller
 } from './api';
 import './AdminPanel.css';
 import Swal from 'sweetalert2';
@@ -91,6 +93,52 @@ const AdminPanel = ({ currentUser }) => {
     const intervalId = setInterval(loadData, 30 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, [loadData]);
+
+  const handleApproveSeller = async (email) => {
+    if (!currentUser?.isSuperAdmin) return;
+
+    try {
+      await approveSeller(email);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Seller Approved',
+        text: `${email} can now manage their own products.`,
+        timer: 1800,
+        showConfirmButton: false
+      });
+      await loadData();
+    } catch (error) {
+      Swal.fire('Error', error.message || 'Failed to approve seller', 'error');
+    }
+  };
+
+  const handleRevokeSeller = async (email) => {
+    if (!currentUser?.isSuperAdmin || email === currentUser?.email) return;
+
+    const result = await Swal.fire({
+      title: 'Revoke seller access?',
+      text: `${email} will lose seller/admin product-management access. Existing products will remain in the database.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Revoke Access',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await revokeSeller(email);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Access Revoked',
+        timer: 1600,
+        showConfirmButton: false
+      });
+      await loadData();
+    } catch (error) {
+      Swal.fire('Error', error.message || 'Failed to revoke seller access', 'error');
+    }
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -439,6 +487,11 @@ const AdminPanel = ({ currentUser }) => {
         <button className={`btn ${activeTab === 'products' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('products')}>
           <i className="bi bi-box-seam"></i> Products
         </button>
+        {currentUser?.isSuperAdmin && (
+          <button className={`btn ${activeTab === 'sellers' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('sellers')}>
+            <i className="bi bi-people"></i> Sellers & Approvals
+          </button>
+        )}
       </div>
 
       {activeTab === 'dashboard' && (
@@ -756,6 +809,84 @@ const AdminPanel = ({ currentUser }) => {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'sellers' && currentUser?.isSuperAdmin && (
+        <div className="row g-4">
+          <div className="col-12">
+            <div className="card shadow">
+              <div className="card-body">
+                <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+                  <div>
+                    <h3 className="card-title mb-1"><i className="bi bi-person-check"></i> Seller approvals</h3>
+                    <p className="text-muted mb-0">Approve or revoke seller/admin access. Only approved sellers can add or edit their own products.</p>
+                  </div>
+                  <span className="badge bg-primary">{sellers.length} registered</span>
+                </div>
+
+                {sellers.length === 0 ? (
+                  <div className="alert alert-info">No seller accounts are registered yet.</div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-hover align-middle">
+                      <thead>
+                        <tr>
+                          <th>Seller</th>
+                          <th>Business</th>
+                          <th>Email</th>
+                          <th>Status</th>
+                          <th className="text-end">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sellers.map((seller) => (
+                          <tr key={seller.email}>
+                            <td>
+                              <strong>{seller.name}</strong>
+                              {seller.isSuperAdmin && <span className="badge bg-dark ms-2">Super Admin</span>}
+                            </td>
+                            <td>{seller.businessName}</td>
+                            <td>{seller.email}</td>
+                            <td>
+                              {seller.isApproved ? (
+                                <span className="badge bg-success">Approved seller</span>
+                              ) : (
+                                <span className="badge bg-warning text-dark">Pending approval</span>
+                              )}
+                            </td>
+                            <td className="text-end">
+                              {seller.isSuperAdmin ? (
+                                <span className="text-muted small">Protected</span>
+                              ) : seller.isApproved ? (
+                                <button
+                                  className="btn btn-outline-danger btn-sm"
+                                  onClick={() => handleRevokeSeller(seller.email)}
+                                >
+                                  <i className="bi bi-person-dash"></i> Revoke
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => handleApproveSeller(seller.email)}
+                                >
+                                  <i className="bi bi-person-check"></i> Approve as Seller
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="alert alert-secondary mt-4 mb-0">
+                  <strong>How it works:</strong> a registered account starts as pending. When you approve it, that Google account becomes a seller/admin and can manage only its own products. Revoking access does not delete its products.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
