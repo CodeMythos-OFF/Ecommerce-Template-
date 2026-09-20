@@ -169,7 +169,6 @@ const ProductCard = React.memo(({ product, quantity, onShowDetails, onAddCart, o
           )}
           <div className="product-price-row">
             <span className="product-price">₹{product.cost}</span>
-            <small className="text-muted ms-1" style={{ fontSize: '0.75rem', fontWeight: 300 }}>+18% GST</small>
             {showMrp ? <span className="product-mrp">₹{mrp}</span> : null}
           </div>
           {shippingText ? <div className="product-shipping">{shippingText}</div> : null}
