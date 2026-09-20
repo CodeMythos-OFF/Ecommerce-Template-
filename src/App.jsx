@@ -1084,79 +1084,153 @@ function App() {
         </div>
       </div>
 
-      <div className={`page ${activePage === "pdetails" ? "active" : ""}`} id="pdetails">
-        {selectedProduct && (
-          <div className="container my-5">
-            <div className="row justify-content-center">
-              <div className="col-md-8">
-                <div className="card shadow">
-                  <div className="row g-0">
-                    <div className="col-md-6">
-                      <img
-                        src={selectedProduct.img}
-                        className="img-fluid rounded-start p-3"
-                        alt={selectedProduct.id}
-                        loading="lazy"
-                      />
+      <div className={`page product-details-page ${activePage === "pdetails" ? "active" : ""}`} id="pdetails">
+        {selectedProduct && (() => {
+          const product = selectedProduct;
+          const rating = Number(product.averageRating || product.rating || 0);
+          const brand = getBrandName(product);
+          const shippingText = product.shippingEtaText || product.shippingText || product.shipping;
+          const stock = Number.isFinite(Number(product.stock)) ? Number(product.stock) : null;
+          const category = (product.category || "Product").toLowerCase();
+          const categoryClass = category.replace(/[^a-z0-9]+/g, "-");
+          const description = product.description || "Detailed product information will be provided by the seller.";
+          const price = Number(product.cost) || 0;
+          const mrp = Number(product.mrp) || 0;
+          const hasDiscount = mrp > price;
+          const discount = hasDiscount ? Math.round(((mrp - price) / mrp) * 100) : 0;
+
+          const highlights = [
+            brand && { icon: "bi-award", label: "Brand", value: brand },
+            { icon: "bi-grid", label: "Category", value: product.category || "Not specified" },
+            product.year && { icon: "bi-calendar3", label: "Model year", value: product.year },
+            stock !== null && { icon: stock > 0 ? "bi-box-seam", label: "Availability", value: stock > 0 ? `${stock} in stock` : "Out of stock" },
+          ].filter(Boolean);
+
+          return (
+            <div className={`container product-details-container product-theme-${categoryClass}`}>
+              <button className="product-back-button" onClick={() => handlePageChange("p")}>
+                <i className="bi bi-arrow-left"></i> Back to products
+              </button>
+
+              <div className="product-hero-card">
+                <div className="product-gallery">
+                  <div className="product-category-pill">{product.category || "Product"}</div>
+                  <img src={product.img} className="product-main-image" alt={product.id} />
+                </div>
+
+                <div className="product-buy-panel">
+                  <div className="product-eyebrow">{brand || "ShopMaster collection"}</div>
+                  <h1>{product.id}</h1>
+
+                  {rating > 0 ? (
+                    <div className="product-rating-large">
+                      <span className="stars">{"★".repeat(Math.floor(rating))}{"☆".repeat(5 - Math.floor(rating))}</span>
+                      <strong>{rating.toFixed(1)}</strong>
+                      <span>out of 5</span>
                     </div>
-                    <div className="col-md-6">
-                      <div className="card-body">
-                        <h3 className="card-title">{selectedProduct.id}</h3>
-                        {(selectedProduct.averageRating || selectedProduct.rating) > 0 && (
-                          <div className="mb-2">
-                            <span className="text-warning" style={{ fontSize: "1.2rem" }}>
-                              {"★".repeat(Math.floor(selectedProduct.averageRating || selectedProduct.rating || 0))}
-                              {"☆".repeat(5 - Math.floor(selectedProduct.averageRating || selectedProduct.rating || 0))}
-                            </span>
-                            <span className="ms-2 text-muted">
-                              ({(selectedProduct.averageRating || selectedProduct.rating || 0).toFixed(1)} out of 5)
-                            </span>
-                          </div>
-                        )}
-                        <p className="card-text">{selectedProduct.description}</p>
-                        <p className="card-text">
-                          <small className="text-muted">Category: {selectedProduct.category}</small>
-                        </p>
-                        {(selectedProduct.brand || selectedProduct.sellerBusinessName || selectedProduct.sellerName) && (
-                          <p className="card-text">
-                            <small className="text-muted">Brand: {getBrandName(selectedProduct)}</small>
-                          </p>
-                        )}
-                        <p className="card-text">
-                          <small className="text-muted">Year: {selectedProduct.year || "N/A"}</small>
-                        </p>
-                        <div className="mb-3">
-                          <h4 className="text-success mb-0">₹{selectedProduct.cost}</h4>
-                          
-                        </div>
-                        {typeof selectedProduct.mrp === "number" && selectedProduct.mrp > selectedProduct.cost ? (
-                          <p className="mb-3">
-                            <small className="text-muted">
-                              MRP: <span style={{ textDecoration: "line-through" }}>₹{selectedProduct.mrp}</span>
-                            </small>
-                          </p>
-                        ) : null}
-                        {(selectedProduct.shippingEtaText || selectedProduct.shippingText || selectedProduct.shipping) && (
-                          <p className="mb-3">
-                            <small className="text-muted">
-                              {selectedProduct.shippingEtaText || selectedProduct.shippingText || selectedProduct.shipping}
-                            </small>
-                          </p>
-                        )}
-                        <button className="btn btn-primary btn-lg w-100" onClick={() => handleAddToCart(selectedProduct)}>
-                          Add to Cart
-                        </button>
-                        <button className="btn btn-secondary w-100 mt-2" onClick={() => handlePageChange("p")}>
-                          Back to Products
-                        </button>
+                  ) : (
+                    <div className="product-rating-empty"><i className="bi bi-star"></i> No rating available yet</div>
+                  )}
+
+                  <div className="product-price-box">
+                    <div className="product-detail-price">₹{price.toLocaleString("en-IN")}</div>
+                    {hasDiscount && (
+                      <div className="product-price-meta">
+                        <span className="product-detail-mrp">MRP ₹{mrp.toLocaleString("en-IN")}</span>
+                        <span className="product-discount">{discount}% off</span>
                       </div>
+                    )}
+                    <div className="product-tax-note">GST not added • Shipping calculated at 5% of subtotal</div>
+                  </div>
+
+                  {shippingText && (
+                    <div className="product-delivery-box">
+                      <i className="bi bi-truck"></i>
+                      <div><strong>Delivery</strong><span>{shippingText}</span></div>
                     </div>
+                  )}
+
+                  <div className="product-action-stack">
+                    <button className="btn btn-primary product-buy-button" onClick={() => handleAddToCart(product)}>
+                      <i className="bi bi-cart-plus"></i> Add to Cart
+                    </button>
+                    <button className="product-secondary-button" onClick={() => handlePageChange("Cart")}>
+                      <i className="bi bi-bag"></i> View Cart
+                    </button>
+                  </div>
+
+                  <div className="product-trust-row">
+                    <div><i className="bi bi-shield-check"></i><span>Secure checkout</span></div>
+                    <div><i className="bi bi-box-seam"></i><span>Tracked order</span></div>
+                    <div><i className="bi bi-headset"></i><span>Support</span></div>
                   </div>
                 </div>
               </div>
+
+              <div className="product-information-grid">
+                <section className="product-info-card product-description-card">
+                  <div className="section-kicker">ABOUT THIS PRODUCT</div>
+                  <h2>Everything you need to know</h2>
+                  <p className="product-long-description">{description}</p>
+                </section>
+
+                <section className="product-info-card">
+                  <div className="section-kicker">AT A GLANCE</div>
+                  <h2>Product details</h2>
+                  <div className="product-spec-list">
+                    {highlights.map((item) => (
+                      <div className="product-spec-row" key={item.label}>
+                        <span className="spec-icon"><i className={`bi ${item.icon}`}></i></span>
+                        <span className="spec-label">{item.label}</span>
+                        <strong>{item.value}</strong>
+                      </div>
+                    ))}
+                    <div className="product-spec-row">
+                      <span className="spec-icon"><i className="bi bi-shop"></i></span>
+                      <span className="spec-label">Sold by</span>
+                      <strong>{product.sellerBusinessName || product.sellerName || "ShopMaster"}</strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="product-info-card product-understanding-card">
+                  <div className="section-kicker">HOW TO UNDERSTAND THE LISTING</div>
+                  <h2>Simple, transparent pricing</h2>
+                  <div className="understanding-item">
+                    <span>01</span><div><strong>Product price</strong><p>₹{price.toLocaleString("en-IN")} is the listed price for this item.</p></div>
+                  </div>
+                  <div className="understanding-item">
+                    <span>02</span><div><strong>Shipping</strong><p>Shipping is calculated separately at 5% of your cart subtotal.</p></div>
+                  </div>
+                  <div className="understanding-item">
+                    <span>03</span><div><strong>Checkout total</strong><p>Your final total is shown before you place the order.</p></div>
+                  </div>
+                </section>
+
+                <section className="product-info-card product-seller-card">
+                  <div className="section-kicker">SELLER INFORMATION</div>
+                  <div className="seller-heading">
+                    <div className="seller-avatar"><i className="bi bi-shop"></i></div>
+                    <div><h2>{product.sellerBusinessName || "ShopMaster"}</h2><p>{product.sellerName || "Verified seller"}</p></div>
+                  </div>
+                  <div className="seller-facts">
+                    <span><i className="bi bi-patch-check"></i> Seller listing</span>
+                    <span><i className="bi bi-tag"></i> {product.category || "General"} category</span>
+                  </div>
+                </section>
+              </div>
+
+              <div className="product-bottom-actions">
+                <button className="btn btn-primary" onClick={() => handleAddToCart(product)}>
+                  <i className="bi bi-cart-plus"></i> Add {product.id} to cart
+                </button>
+                <button className="btn btn-outline-secondary" onClick={() => handlePageChange("p")}>
+                  Continue shopping
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       <div id="home" className={`page ${activePage === "home" ? "active" : ""}`}>
