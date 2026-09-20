@@ -511,6 +511,7 @@ app.get('/api/auth/me', (req, res) => {
 
   return res.json({
     success: true,
+    authenticated: true,
     user: {
       provider: user.provider,
       sub: user.sub,
