@@ -447,3 +447,88 @@
         font-size: 1.8rem;
     }
 }
+/* =========================================================
+   MOBILE-FIRST NAVIGATION
+   ========================================================= */
+@media screen and (max-width: 767.98px) {
+  .navigation {
+    position: sticky;
+    top: 0;
+    padding: 10px 12px 8px;
+    display: block;
+    min-height: 58px;
+    z-index: 1100;
+  }
+
+  .navigation > .d-flex.align-items-center.justify-content-between.w-100 {
+    min-height: 40px;
+  }
+
+  .navigation .heading {
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .mobile-menu-toggle {
+    display: none;
+  }
+
+  /* On phones, search is a first-class navigation element rather than a menu item. */
+  .navigation .mobileSearchClass,
+  .navigation > div.w-100.px-3.pb-2.d-md-none {
+    display: block !important;
+    padding: 8px 0 2px !important;
+  }
+
+  .navigation > div.w-100.px-3.pb-2.d-md-none .form-control {
+    min-height: 42px;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px;
+    padding-left: 14px;
+    font-size: 0.9rem;
+  }
+
+  .navigation > div.w-100.px-3.pb-2.d-md-none.d-none {
+    display: none !important;
+  }
+
+  /* Desktop links are replaced by the fixed bottom navigation. */
+  .navigation-links {
+    display: none !important;
+  }
+
+  .bottom-navigation {
+    display: block;
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 1200;
+  }
+
+  .bottom-nav-container {
+    height: 64px;
+  }
+
+  .nav-item {
+    min-height: 64px;
+    padding: 7px 4px 5px;
+    gap: 3px;
+  }
+
+  .nav-icon,
+  .nav-item:not(.active) .nav-icon,
+  .nav-item.active .nav-icon {
+    font-size: 1.25rem;
+  }
+
+  .nav-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+
+  .cart-badge {
+    top: 5px;
+    right: calc(50% - 22px);
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.62rem;
+  }
+}
