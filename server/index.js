@@ -595,7 +595,7 @@ app.post('/api/sellers/register', async (req, res) => {
       businessName,
       phone,
       address,
-      isApproved: email === 'rohan.sivaa@gmail.com'
+      isApproved: email.toLowerCase() === SUPER_ADMIN_EMAIL
     });
     
     res.status(201).json(seller);
@@ -620,6 +620,11 @@ app.get('/api/sellers/:email', async (req, res) => {
 
 app.get('/api/sellers', async (req, res) => {
   try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access is required' });
+    }
+
     const sellers = await Seller.find().sort({ createdAt: -1 }).maxTimeMS(5000);
     res.json(sellers);
   } catch (error) {
@@ -630,8 +635,13 @@ app.get('/api/sellers', async (req, res) => {
 
 app.put('/api/sellers/:email/approve', async (req, res) => {
   try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Only the super admin can approve sellers' });
+    }
+
     const seller = await Seller.findOneAndUpdate(
-      { email: req.params.email },
+      { email: req.params.email.toLowerCase() },
       { isApproved: true, updatedAt: new Date() },
       { new: true }
     ).maxTimeMS(5000);
@@ -639,10 +649,45 @@ app.put('/api/sellers/:email/approve', async (req, res) => {
     if (!seller) {
       return res.status(404).json({ error: 'Seller not found' });
     }
+
+    if (seller.email.toLowerCase() === SUPER_ADMIN_EMAIL) {
+      seller.isApproved = true;
+      seller.isSuperAdmin = true;
+      await seller.save();
+    }
     
-    res.json(seller);
+    res.json({ success: true, seller, message: 'Seller approved successfully' });
   } catch (error) {
     console.error('Approve seller error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/sellers/:email/revoke', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Only the super admin can revoke seller access' });
+    }
+
+    const email = req.params.email.toLowerCase();
+    if (email === SUPER_ADMIN_EMAIL) {
+      return res.status(400).json({ error: 'The super admin cannot be revoked' });
+    }
+
+    const seller = await Seller.findOneAndUpdate(
+      { email },
+      { isApproved: false, updatedAt: new Date() },
+      { new: true }
+    ).maxTimeMS(5000);
+
+    if (!seller) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+
+    res.json({ success: true, seller, message: 'Seller access revoked' });
+  } catch (error) {
+    console.error('Revoke seller error:', error);
     res.status(500).json({ error: error.message });
   }
 });
