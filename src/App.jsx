@@ -547,7 +547,7 @@ function App() {
     [currentUser, cartItems]
   );
 
-  const { groupedCart, subtotal, gstAmount, totalPrice } = useMemo(() => {
+  const { groupedCart, subtotal, shippingAmount, totalPrice } = useMemo(() => {
     const grouped = cartItems.reduce((acc, item) => {
       const existingItem = acc.find((i) => i.id === item.id);
       if (existingItem) {
@@ -558,9 +558,9 @@ function App() {
       return acc;
     }, []);
     const sub = grouped.reduce((sum, item) => sum + item.cost * item.quantity, 0);
-    const gst = Math.round(sub * 0.18);
-    const total = sub + gst;
-    return { groupedCart: grouped, subtotal: sub, gstAmount: gst, totalPrice: total };
+    const shipping = Math.round(sub * 0.05);
+    const total = sub + shipping;
+    return { groupedCart: grouped, subtotal: sub, shippingAmount: shipping, totalPrice: total };
   }, [cartItems]);
 
   const handleCheckout = useCallback(async () => {
@@ -704,7 +704,7 @@ function App() {
         userName: currentUser.name,
         items: cartItems.length,
         subtotal: subtotal,
-        gstAmount: gstAmount,
+        shippingAmount: shippingAmount,
         total: totalPrice,
         products: groupedCart.map((item) => ({
           name: item.id,
@@ -742,7 +742,7 @@ function App() {
           <div class="text-start mt-3 p-3" style="background: #f8f9fa; border-radius: 8px;">
             <small class="text-muted d-block mb-1"><strong>Checkout Summary:</strong></small>
             <div class="d-flex justify-content-between small"><span>Subtotal:</span><span>₹${subtotal}</span></div>
-            <div class="d-flex justify-content-between small"><span>GST (18%):</span><span>₹${gstAmount}</span></div>
+            <div class="d-flex justify-content-between small"><span>Shipping (5%):</span><span>₹${shippingAmount}</span></div>
             <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-1"><span>Total:</span><span>₹${totalPrice}</span></div>
             <small class="text-muted d-block mt-2"><strong>Delivery Address:</strong></small>
             <small>${formValues.name}</small><br>
@@ -767,7 +767,7 @@ function App() {
         confirmButtonText: "OK",
       });
     }
-  }, [currentUser, cartItems, totalPrice, subtotal, gstAmount, groupedCart, handlePageChange]);
+  }, [currentUser, cartItems, totalPrice, subtotal, shippingAmount, groupedCart, handlePageChange]);
 
   const handleSignInSuccess = useCallback(
     (userData) => {
@@ -1127,7 +1127,7 @@ function App() {
                         </p>
                         <div className="mb-3">
                           <h4 className="text-success mb-0">₹{selectedProduct.cost}</h4>
-                          <small className="text-muted" style={{ fontWeight: 300 }}>+18% GST (Calculated at checkout)</small>
+                          
                         </div>
                         {typeof selectedProduct.mrp === "number" && selectedProduct.mrp > selectedProduct.cost ? (
                           <p className="mb-3">
@@ -1273,8 +1273,8 @@ function App() {
                           <span className="fw-bold">₹{subtotal}</span>
                         </div>
                         <div className="d-flex justify-content-between align-items-center mb-1">
-                          <span className="text-muted">GST (18%):</span>
-                          <span className="fw-bold">₹{gstAmount}</span>
+                          <span className="text-muted">Shipping (5%):</span>
+                          <span className="fw-bold">₹{shippingAmount}</span>
                         </div>
                         <div className="d-flex justify-content-between align-items-center mt-2 border-top pt-2">
                           <h4 className="mb-0">Total:</h4>
