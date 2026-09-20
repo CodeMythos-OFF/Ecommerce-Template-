@@ -282,14 +282,54 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const user = getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      setIsAdmin(user.isAdmin === true);
-      const savedCart = getCart(user.email);
-      setCartItems(savedCart);
-    }
-    setAuthChecked(true);
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const restoreSession = async () => {
+      try {
+        // The server-side HttpOnly cookie is the source of truth after a refresh.
+        // Do not rely only on sessionStorage, because browser/session state can be cleared.
+        const response = await fetch(`AUTH_API_URL + "/auth/me" + `, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (cancelled) return;
+
+        if (response.ok && data.authenticated && data.user) {
+          setCurrentUser(data.user);
+          setIsAdmin(data.user.isAdmin === true);
+          setCartItems(getCart(data.user.email));
+          sessionStorage.setItem("authUser", JSON.stringify(data.user));
+        } else {
+          // Only clear the cached user when the server explicitly says there is no session.
+          sessionStorage.removeItem("authUser");
+          setCurrentUser(null);
+          setIsAdmin(false);
+          setCartItems([]);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Session restore failed:", error);
+          // Keep a valid cached user if the network is temporarily unavailable.
+          const cachedUser = getCurrentUser();
+          if (cachedUser) {
+            setCurrentUser(cachedUser);
+            setIsAdmin(cachedUser.isAdmin === true);
+            setCartItems(getCart(cachedUser.email));
+          }
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        if (!cancelled) setAuthChecked(true);
+      }
+    };
+
+    restoreSession();
     loadProducts();
     trackView();
     const loadingTimer = setTimeout(() => {
@@ -300,6 +340,9 @@ function App() {
     };
     window.addEventListener("productsUpdated", handleProductsUpdated);
     return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timeoutId);
       clearTimeout(loadingTimer);
       window.removeEventListener("productsUpdated", handleProductsUpdated);
     };
