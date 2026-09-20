@@ -12,7 +12,7 @@ import { trackView, createOrder, getProducts } from "./api";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
 import Swal from "sweetalert2";
 
-const AUTH_API_URL = import.meta.env.VITE_API_URL || "https://backend-cm-test.vercel.app/api";
+const AUTH_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
 const ROUTES = {
   "#dashboard": "dashboard",
