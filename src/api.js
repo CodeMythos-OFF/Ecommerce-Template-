@@ -304,12 +304,14 @@ export const registerSeller = async (sellerData) => {
 
 export const getAllSellers = async () => {
   try {
-    const response = await fetchWithRetry(`${API_URL}/sellers`);
+    const response = await fetchWithRetry(`${API_URL}/sellers`, {
+      headers: getAuthHeaders()
+    });
     if (!response.ok) throw new Error('Failed to get sellers');
     return await response.json();
   } catch (error) {
     console.error('Error getting all sellers:', error.message);
-    return [];
+    throw error;
   }
 };
 
@@ -318,7 +320,8 @@ export const approveSeller = async (email) => {
     if (!email) throw new Error('Email is required');
 
     const response = await fetchWithRetry(`${API_URL}/sellers/${encodeURIComponent(email)}/approve`, {
-      method: 'PUT'
+      method: 'PUT',
+      headers: getAuthHeaders()
     });
 
     if (!response.ok) {
@@ -329,6 +332,27 @@ export const approveSeller = async (email) => {
     return await response.json();
   } catch (error) {
     console.error('Error approving seller:', error.message);
+    throw error;
+  }
+};
+
+export const revokeSeller = async (email) => {
+  try {
+    if (!email) throw new Error('Email is required');
+
+    const response = await fetchWithRetry(`${API_URL}/sellers/${encodeURIComponent(email)}/revoke`, {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to revoke seller access');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error revoking seller:', error.message);
     throw error;
   }
 };
