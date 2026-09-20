@@ -580,6 +580,49 @@ app.post('/api/auth/logout', (req, res) => {
 
 // ========== SELLER ROUTES ==========
 
+app.post('/api/sellers/apply', async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Please sign in before applying to become a seller' });
+    }
+
+    const email = sessionUser.email.toLowerCase();
+    const { name, businessName, phone, address } = req.body;
+
+    if (!businessName || String(businessName).trim().length < 2) {
+      return res.status(400).json({ error: 'A valid business or brand name is required' });
+    }
+
+    const existing = await Seller.findOne({ email }).maxTimeMS(5000);
+    if (existing) {
+      if (existing.isSuperAdmin || existing.isApproved) {
+        return res.status(400).json({ error: 'This account already has seller access' });
+      }
+      return res.status(409).json({ error: 'A seller application for this account is already pending approval' });
+    }
+
+    const seller = await Seller.create({
+      email,
+      name: String(name || sessionUser.name || email.split('@')[0]).trim(),
+      businessName: String(businessName).trim(),
+      phone: String(phone || '').trim(),
+      address: String(address || '').trim(),
+      isApproved: false,
+      isSuperAdmin: false
+    });
+
+    res.status(201).json({
+      success: true,
+      seller,
+      message: 'Seller application submitted. Please wait for super admin approval.'
+    });
+  } catch (error) {
+    console.error('Seller application error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/sellers/register', async (req, res) => {
   try {
     const { email, name, businessName, phone, address } = req.body;
