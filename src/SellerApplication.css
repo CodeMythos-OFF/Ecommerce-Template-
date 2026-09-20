@@ -1,0 +1,38 @@
+
+/* Seller application */
+.seller-application-page{min-height:calc(100vh - 72px);background:linear-gradient(180deg,#f4fafb 0%,#f7f9fc 55%,#fff 100%);padding-bottom:50px}
+.seller-application-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:28px;padding:30px 0 24px}
+.seller-application-hero h1{max-width:760px;font-size:clamp(2rem,5vw,3.8rem);line-height:1.02;letter-spacing:-.05em;color:#172033;margin:7px 0 14px}
+.seller-application-hero p{max-width:700px;color:#667085;font-size:1rem;line-height:1.7;margin:0}
+.seller-hero-badge{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dcebed;color:#087f8c;border-radius:999px;padding:10px 14px;font-size:.8rem;font-weight:800;white-space:nowrap}
+.seller-application-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.55fr);gap:18px;align-items:start}
+.seller-application-card,.seller-benefits-card{background:#fff;border:1px solid #e4e9ee;border-radius:22px;box-shadow:0 12px 34px rgba(23,32,51,.06)}
+.seller-application-card{padding:30px}
+.seller-card-heading{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:25px}
+.seller-card-heading h2,.seller-benefits-card h2{font-size:1.5rem;letter-spacing:-.03em;margin:5px 0 0;color:#172033}
+.seller-step{width:42px;height:42px;border-radius:13px;background:#eef9fa;color:#087f8c;display:grid;place-items:center;font-weight:900}
+.seller-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:17px}
+.seller-form-grid label{display:block}
+.seller-form-grid label>span{display:block;font-weight:750;color:#344054;font-size:.86rem;margin-bottom:7px}
+.seller-form-grid small{display:block;color:#8a94a5;margin-top:5px;font-size:.72rem}
+.seller-full{grid-column:1/-1}
+.seller-form-grid .form-control{min-height:48px;border:1px solid #dce3e9;background:#fbfcfd}
+.seller-form-grid .form-control:focus{border-color:#087f8c;box-shadow:0 0 0 3px rgba(8,127,140,.1)}
+.seller-application-note{display:flex;gap:10px;padding:13px 15px;background:#f5fafb;border:1px solid #dcebed;border-radius:13px;margin:22px 0;color:#5c6879;font-size:.8rem;line-height:1.55}
+.seller-application-note i{color:#087f8c;font-size:1rem}
+.seller-submit-button{min-height:50px;padding:0 20px;font-weight:800}
+.seller-benefits-card{padding:27px;position:sticky;top:90px;background:linear-gradient(145deg,#172033,#26374e);color:#fff;border:0}
+.seller-benefits-icon{width:52px;height:52px;border-radius:15px;background:rgba(127,226,233,.12);color:#7fe2e9;display:grid;place-items:center;font-size:1.4rem;margin-bottom:22px}
+.seller-benefits-card .section-kicker{color:#7fe2e9}
+.seller-benefits-card h2{color:#fff;margin-bottom:18px}
+.seller-benefits-card ul{list-style:none;padding:0;margin:0;display:grid;gap:14px}
+.seller-benefits-card li{display:flex;gap:10px;color:rgba(255,255,255,.78);font-size:.86rem;line-height:1.5}
+.seller-benefits-card li i{color:#7fe2e9;font-weight:900}
+.seller-security-note{border-top:1px solid rgba(255,255,255,.12);margin-top:23px;padding-top:17px;display:flex;gap:9px;color:rgba(255,255,255,.6);font-size:.73rem;line-height:1.5}
+.seller-security-note i{color:#7fe2e9}
+.seller-login-card{text-align:center;max-width:650px;margin:40px auto;padding:50px 30px}
+.seller-application-icon{width:68px;height:68px;margin:0 auto 20px;border-radius:20px;background:#eef9fa;color:#087f8c;display:grid;place-items:center;font-size:1.7rem}
+.seller-login-card h1{font-size:2rem;margin:8px 0}
+.seller-login-card p{color:#667085;line-height:1.7;margin:0}
+@media(max-width:900px){.seller-application-layout{grid-template-columns:1fr}.seller-benefits-card{position:static}.seller-application-hero{align-items:flex-start;flex-direction:column}.seller-hero-badge{align-self:flex-start}}
+@media(max-width:600px){.seller-application-hero{padding-top:16px}.seller-application-hero h1{font-size:2.15rem}.seller-application-card{padding:20px 16px;border-radius:17px}.seller-form-grid{grid-template-columns:1fr;gap:14px}.seller-full{grid-column:auto}.seller-benefits-card{padding:22px 18px;border-radius:17px}.seller-submit-button{width:100%}}
