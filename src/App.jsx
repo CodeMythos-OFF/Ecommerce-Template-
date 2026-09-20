@@ -831,6 +831,7 @@ function App() {
       setCartItems([]);
       setIsAdmin(false);
       window.dispatchEvent(new Event("userChanged"));
+      window.dispatchEvent(new Event("authSignedOut"));
       window.location.hash = "#home";
       setActivePage("home");
 
