@@ -4,6 +4,7 @@ import {
   getOrders,
   checkBackendHealth,
   getProducts,
+  getAllSellers,
   addProduct,
   updateProduct,
   deleteProduct,
@@ -13,7 +14,7 @@ import {
 import './AdminPanel.css';
 import Swal from 'sweetalert2';
 
-const AdminPanel = () => {
+const AdminPanel = ({ currentUser }) => {
   const [stats, setStats] = useState({
     totalViews: 0,
     totalOrders: 0,
@@ -33,6 +34,7 @@ const AdminPanel = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [sellers, setSellers] = useState([]);
 
   const [newProduct, setNewProduct] = useState({
     id: '',
@@ -41,7 +43,8 @@ const AdminPanel = () => {
     img: '',
     category: '',
     brand: '',
-    description: ''
+    description: '',
+    sellerEmail: ''
   });
 
   const loadData = useCallback(async () => {
@@ -51,11 +54,19 @@ const AdminPanel = () => {
       setBackendOnline(isOnline);
 
       try {
+        const sellerEmail = currentUser?.isSuperAdmin ? null : currentUser?.email;
         const [statsData, ordersData, productsData] = await Promise.all([
-          getStats(),
-          getOrders(50),
-          getProducts()
+          getStats(sellerEmail),
+          getOrders(50, sellerEmail),
+          getProducts(sellerEmail)
         ]);
+
+        if (currentUser?.isSuperAdmin) {
+          const sellersData = await getAllSellers();
+          setSellers(Array.isArray(sellersData) ? sellersData : []);
+        } else {
+          setSellers([]);
+        }
         setStats(statsData || {});
         setOrders(Array.isArray(ordersData) ? ordersData : []);
         setProducts(Array.isArray(productsData) ? productsData : []);
@@ -73,7 +84,7 @@ const AdminPanel = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     loadData();
@@ -145,8 +156,13 @@ const AdminPanel = () => {
         ...newProduct,
         cost,
         year: parseInt(newProduct.year),
-        brand: newProduct.brand?.trim() || undefined
+        brand: newProduct.brand?.trim() || undefined,
+        sellerEmail: currentUser?.isSuperAdmin ? newProduct.sellerEmail : currentUser?.email
       };
+
+      if (currentUser?.isSuperAdmin && !productData.sellerEmail) {
+        throw new Error('Select a seller before adding a product.');
+      }
 
       if (editingProduct) {
         await updateProduct(editingProduct, productData);
@@ -198,8 +214,9 @@ const AdminPanel = () => {
       cost: product.cost || '',
       img: product.img || '',
       category: product.category || '',
-      brand: product.brand || '',
-      description: product.description || ''
+      brand: product.brand || product.sellerBusinessName || '',
+      description: product.description || '',
+      sellerEmail: product.sellerEmail || ''
     });
     setImagePreview(product.img || null);
     setActiveTab('products');
@@ -234,9 +251,26 @@ const AdminPanel = () => {
     });
 
     if (result.isConfirmed) {
+      if (!currentUser?.isSuperAdmin) {
+        await Swal.fire({ icon: 'error', title: 'Super admin only', text: 'Only the super admin can permanently delete products.' });
+        return;
+      }
+
+      const pinResult = await Swal.fire({
+        title: 'Super Admin PIN',
+        input: 'password',
+        inputLabel: 'Enter the PIN to permanently delete this product',
+        inputPlaceholder: 'PIN',
+        inputAttributes: { maxlength: 32, autocapitalize: 'off', autocorrect: 'off' },
+        showCancelButton: true,
+        confirmButtonText: 'Verify & Delete',
+        inputValidator: (value) => !value ? 'PIN is required' : undefined
+      });
+      if (!pinResult.isConfirmed) return;
+
       setProductLoading(true);
       try {
-        await deleteProduct(productId);
+        await deleteProduct(productId, pinResult.value);
         Swal.fire({
           icon: 'success',
           title: 'Deleted!',
@@ -282,8 +316,25 @@ const AdminPanel = () => {
     });
 
     if (result.isConfirmed) {
+      if (!currentUser?.isSuperAdmin) {
+        await Swal.fire({ icon: 'error', title: 'Super admin only', text: 'Only the super admin can permanently delete orders.' });
+        return;
+      }
+
+      const pinResult = await Swal.fire({
+        title: 'Super Admin PIN',
+        input: 'password',
+        inputLabel: 'Enter the PIN to permanently delete this order',
+        inputPlaceholder: 'PIN',
+        inputAttributes: { maxlength: 32, autocapitalize: 'off', autocorrect: 'off' },
+        showCancelButton: true,
+        confirmButtonText: 'Verify & Delete',
+        inputValidator: (value) => !value ? 'PIN is required' : undefined
+      });
+      if (!pinResult.isConfirmed) return;
+
       try {
-        await deleteOrder(orderId);
+        await deleteOrder(orderId, pinResult.value);
         setOrders((prevOrders) => prevOrders.filter((o) => (o._id || o.id) !== orderId));
         setStats((prevStats) => ({
           ...prevStats,
@@ -744,7 +795,7 @@ const AdminPanel = () => {
                         onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
                         placeholder="e.g., CNCMART, ULTRA"
                       />
-                      <small className="text-muted">Optional - Enter brand name like CNCMART or ULTRA</small>
+                      <small className="text-muted">Defaults to the seller's business name. Sellers can use their own brand for their products.</small>
                     </div>
 
                     <div className="mb-3">
@@ -795,6 +846,33 @@ const AdminPanel = () => {
                         </div>
                       )}
                     </div>
+
+                    {currentUser?.isSuperAdmin && (
+                      <div className="mb-3">
+                        <label className="form-label">Seller *</label>
+                        <select
+                          className="form-select"
+                          value={newProduct.sellerEmail}
+                          onChange={(e) => {
+                            const email = e.target.value;
+                            const seller = sellers.find((item) => item.email === email);
+                            setNewProduct((prev) => ({
+                              ...prev,
+                              sellerEmail: email,
+                              brand: prev.brand || seller?.businessName || ''
+                            }));
+                          }}
+                          disabled={Boolean(editingProduct)}
+                        >
+                          <option value="">Select seller</option>
+                          {sellers.filter((seller) => seller.isApproved).map((seller) => (
+                            <option key={seller.email} value={seller.email}>
+                              {seller.businessName} — {seller.name} ({seller.email})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div className="mb-3">
                       <label className="form-label">Category *</label>
