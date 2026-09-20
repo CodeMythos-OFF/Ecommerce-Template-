@@ -124,6 +124,13 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
               Products
             </a>
           </li>
+          {currentUser && !currentUser.isSeller && !currentUser.isSuperAdmin && (
+            <li className={activePage === 'sellerapply' ? 'active-nav-link' : ''}>
+              <a href="#sellerapply" onClick={go('sellerapply')}>
+                Sell
+              </a>
+            </li>
+          )}
           <li className={activePage === 'Cart' ? 'active-nav-link' : ''}>
             <a href="#Cart" onClick={go('Cart')} className="position-relative">
               Cart ({cartCount})
