@@ -1090,7 +1090,7 @@ function App() {
           const rating = Number(product.averageRating || product.rating || 0);
           // Brand is the product brand entered in the Admin Panel.
           // Do not fall back to the seller's personal name here.
-          const brand = (product.brand || "").trim();
+          const brand = (product.brand || product.sellerBusinessName || "").trim();
           const shippingText = product.shippingEtaText || product.shippingText || product.shipping;
           const stock = Number.isFinite(Number(product.stock)) ? Number(product.stock) : null;
           const category = (product.category || "Product").toLowerCase();
