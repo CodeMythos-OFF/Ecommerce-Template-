@@ -251,6 +251,8 @@ const orderSchema = new mongoose.Schema({
   user: { type: String, required: true },
   userName: { type: String, required: true },
   items: { type: Number, required: true },
+  subtotal: { type: Number, default: 0 },
+  shippingAmount: { type: Number, default: 0 },
   total: { type: Number, required: true },
   products: [{
     name: String,
@@ -792,7 +794,7 @@ const generateTrackingId = () => {
 // Create order with email notification
 app.post('/api/orders', async (req, res) => {
   try {
-    const { user, userName, items, total, products, cart, address } = req.body;
+    const { user, userName, items, subtotal, shippingAmount, total, products, cart, address } = req.body;
 
     // Validate address
     if (!address || !address.name || !address.street || !address.city || !address.state || !address.pincode || !address.phone) {
@@ -816,6 +818,8 @@ app.post('/api/orders', async (req, res) => {
       user,
       userName,
       items,
+      subtotal: Number(subtotal) || 0,
+      shippingAmount: Number(shippingAmount) || 0,
       total,
       products,
       cart: cart || [],  // Store full cart items with images and details
