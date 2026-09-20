@@ -881,7 +881,7 @@ function App() {
 
       <div id="admin" className={`page ${activePage === "admin" ? "active" : ""}`}>
         {isAdmin ? (
-          <AdminPanel />
+          <AdminPanel currentUser={currentUser} />
         ) : (
           <div className="container py-5">
             <div className="alert alert-danger text-center">
