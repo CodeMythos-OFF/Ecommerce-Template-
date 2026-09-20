@@ -15,6 +15,14 @@ const fetchWithRetry = async (url, options = {}, retries = 2) => {
   }
 };
 
+const getAuthHeaders = (extra = {}) => {
+  const token = localStorage.getItem('shopmaster_session_token');
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 export const checkBackendHealth = async () => {
   try {
     const response = await fetchWithRetry(`${API_URL}/health`);
@@ -145,7 +153,8 @@ export const deleteOrder = async (orderId) => {
     if (!orderId) throw new Error('Order ID is required');
 
     const response = await fetchWithRetry(`${API_URL}/orders/${encodeURIComponent(orderId)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
 
     if (!response.ok) {
@@ -188,7 +197,7 @@ export const addProduct = async (productData) => {
 
     const response = await fetchWithRetry(`${API_URL}/products`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(productData)
     });
 
@@ -235,8 +244,8 @@ export const deleteProduct = async (productId, sellerEmail = 'rohan.sivaa@gmail.
     if (!productId) throw new Error('Product ID is required');
 
     const response = await fetchWithRetry(
-      `${API_URL}/products/${encodeURIComponent(productId)}?sellerEmail=${encodeURIComponent(sellerEmail)}`,
-      { method: 'DELETE' }
+      `${API_URL}/products/${encodeURIComponent(productId)}`,
+      { method: 'DELETE', headers: getAuthHeaders() }
     );
 
     if (!response.ok) {
@@ -332,7 +341,7 @@ export const updateOrderStatus = async (orderId, newStatus) => {
 
     const response = await fetchWithRetry(`${API_URL}/orders/${encodeURIComponent(orderId)}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ status: newStatus })
     });
 
