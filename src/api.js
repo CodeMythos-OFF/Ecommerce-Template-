@@ -260,6 +260,26 @@ export const deleteProduct = async (productId, pin = '', sellerEmail = '') => {
   }
 };
 
+export const applyAsSeller = async (sellerData) => {
+  try {
+    const response = await fetchWithRetry(`${API_URL}/sellers/apply`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(sellerData)
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to submit seller application');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error applying as seller:', error.message);
+    throw error;
+  }
+};
+
 export const getSeller = async (email) => {
   try {
     if (!email) throw new Error('Email is required');
