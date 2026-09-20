@@ -233,6 +233,7 @@ const productSchema = new mongoose.Schema({
   category: { type: String, required: true },
   description: { type: String, required: true },
   sellerEmail: { type: String, required: true },
+  sellerId: { type: String },
   sellerName: { type: String, required: true },
   sellerBusinessName: { type: String, required: true },
   stock: { type: Number, default: 100 },
@@ -666,6 +667,7 @@ app.post('/api/products', async (req, res) => {
       category,
       description,
       sellerEmail,
+      sellerId: String(seller._id),
       sellerName: seller.name,
       sellerBusinessName: seller.businessName
     });
