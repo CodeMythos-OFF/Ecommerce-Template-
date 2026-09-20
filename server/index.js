@@ -125,8 +125,10 @@ const clearAuthCookie = (res) => {
 };
 
 const getSessionUser = (req) => {
-  const token = parseCookies(req).shopmaster_session;
-  return verifySessionToken(token);
+  const authHeader = req.headers.authorization || '';
+  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const cookieToken = parseCookies(req).shopmaster_session;
+  return verifySessionToken(bearer || cookieToken);
 };
 
 // MongoDB Connection with proper error handling
@@ -490,8 +492,9 @@ app.post('/api/auth/google/verify', async (req, res) => {
       isAdmin: ADMIN_EMAILS.includes(payload.email.toLowerCase()),
     };
 
-    setAuthCookie(res, createSessionToken(user));
-    return res.json({ success: true, user });
+    const sessionToken = createSessionToken(user);
+    setAuthCookie(res, sessionToken);
+    return res.json({ success: true, user, sessionToken });
   } catch (error) {
     console.error('Google ID token verification failed:', error.message);
     return res.status(401).json({ success: false, error: 'Invalid Google credential' });
