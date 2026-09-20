@@ -4,7 +4,7 @@ import GoogleAuthService from './services/GoogleAuthService';
 
 const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
-const Auth = ({ onSignInSuccess, onSignInFailure }) => {
+const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,19 +111,27 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
       controller.abort();
     };
   }, [applyUser, clearUser]);
-  // Keep the login page UI synchronized when the dashboard signs out.
+  // Keep this component synchronized with the App-level authentication state.
+  // This is more reliable than relying only on a browser event.
   useEffect(() => {
-    const handleExternalSignOut = () => {
+    if (isAuthenticated === false) {
       clearUser();
       setIsLoading(false);
       setIsGoogleLoading(false);
       setGoogleError('');
       setGoogleReady(true);
-    };
+      googleButtonRenderedRef.current = false;
 
-    window.addEventListener('authSignedOut', handleExternalSignOut);
-    return () => window.removeEventListener('authSignedOut', handleExternalSignOut);
-  }, [clearUser]);
+      requestAnimationFrame(() => {
+        if (googleButtonRef.current && !googleButtonRenderedRef.current) {
+          const rendered = GoogleAuthService.renderButton(googleButtonRef.current, { width: 250 });
+          if (rendered) {
+            googleButtonRenderedRef.current = true;
+          }
+        }
+      });
+    }
+  }, [isAuthenticated, clearUser]);
 
   // Initialize Google once and render its button only once per mount.
   useEffect(() => {
