@@ -239,13 +239,13 @@ export const updateProduct = async (productId, productData) => {
   }
 };
 
-export const deleteProduct = async (productId, pin = '') => {
+export const deleteProduct = async (productId, pin = '', sellerEmail = '') => {
   try {
     if (!productId) throw new Error('Product ID is required');
 
     const response = await fetchWithRetry(
       `${API_URL}/products/${encodeURIComponent(productId)}`,
-      { method: 'DELETE', headers: getAuthHeaders(pin ? { 'X-Super-Admin-Pin': pin } : {}) }
+      { method: 'DELETE', headers: getAuthHeaders({ ...(pin ? { 'X-Super-Admin-Pin': pin } : {}), ...(sellerEmail ? { 'X-Product-Seller-Email': sellerEmail } : {}) }) }
     );
 
     if (!response.ok) {
