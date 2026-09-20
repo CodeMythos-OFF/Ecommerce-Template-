@@ -1099,12 +1099,33 @@ function App() {
           const hasDiscount = mrp > price;
           const discount = hasDiscount ? Math.round(((mrp - price) / mrp) * 100) : 0;
 
-          const highlights = [
-            brand && { icon: "bi-award", label: "Brand", value: brand },
-            { icon: "bi-grid", label: "Category", value: product.category || "Not specified" },
-            product.year && { icon: "bi-calendar3", label: "Model year", value: product.year },
-            stock !== null && { icon: stock > 0 ? "bi-box-seam", label: "Availability", value: stock > 0 ? `${stock} in stock` : "Out of stock" },
-          ].filter(Boolean);
+          const highlights = [];
+
+          if (brand) {
+            highlights.push({ icon: "bi-award", label: "Brand", value: brand });
+          }
+
+          highlights.push({
+            icon: "bi-grid",
+            label: "Category",
+            value: product.category || "Not specified",
+          });
+
+          if (product.year) {
+            highlights.push({
+              icon: "bi-calendar3",
+              label: "Model year",
+              value: product.year,
+            });
+          }
+
+          if (stock !== null) {
+            highlights.push({
+              icon: stock > 0 ? "bi-box-seam" : "bi-x-circle",
+              label: "Availability",
+              value: stock > 0 ? `${stock} in stock` : "Out of stock",
+            });
+          }
 
           return (
             <div className={`container product-details-container product-theme-${categoryClass}`}>
