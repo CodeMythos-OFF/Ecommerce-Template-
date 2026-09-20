@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Navigation from "./Navigation";
 import Auth from "./Auth";
+import GoogleAuthService from "./services/GoogleAuthService";
 import AdminPanel from "./AdminPanel";
 import OrderHistory from "./OrderHistory";
 import PrivacyPolicy from "./PrivacyPolicy";
@@ -10,6 +11,8 @@ import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./
 import { trackView, createOrder, getProducts } from "./api";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
 import Swal from "sweetalert2";
+
+const AUTH_API_URL = import.meta.env.VITE_API_URL || "https://shopmaster-backend.vercel.app/api";
 
 const ROUTES = {
   "#dashboard": "dashboard",
@@ -754,26 +757,37 @@ function App() {
       showCancelButton: true,
       confirmButtonText: "Yes, sign out",
       cancelButtonText: "Cancel",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        sessionStorage.removeItem("authUser");
-        sessionStorage.removeItem("authToken");
-        setCurrentUser(null);
-        setCartItems([]);
-        setIsAdmin(false);
-        window.dispatchEvent(new Event("userChanged"));
-        Swal.fire({
-          icon: "success",
-          title: "Signed Out",
-          text: "You have been signed out successfully",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-        setTimeout(() => handlePageChange("home"), 1500);
-      }
-    });
-  }, [handlePageChange]);
+    }).then(async (result) => {
+      if (!result.isConfirmed) return;
 
+      try {
+        await fetch(AUTH_API_URL + "/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (error) {
+        console.warn("Logout request failed:", error);
+      }
+
+      GoogleAuthService.signOut();
+      sessionStorage.removeItem("authUser");
+      sessionStorage.removeItem("authToken");
+      setCurrentUser(null);
+      setCartItems([]);
+      setIsAdmin(false);
+      window.dispatchEvent(new Event("userChanged"));
+      window.location.hash = "#home";
+      setActivePage("home");
+
+      Swal.fire({
+        icon: "success",
+        title: "Signed Out",
+        text: "You have been signed out successfully",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    });
+  }, []);
   const sectionCategories = useMemo(() => {
     const cats = Array.from(new Set(products.map((p) => (p.category || "").trim()).filter(Boolean)));
     return cats.slice(0, 6);
