@@ -148,13 +148,13 @@ export const getOrders = async (limit = 50, sellerEmail = null) => {
   }
 };
 
-export const deleteOrder = async (orderId) => {
+export const deleteOrder = async (orderId, pin = '') => {
   try {
     if (!orderId) throw new Error('Order ID is required');
 
     const response = await fetchWithRetry(`${API_URL}/orders/${encodeURIComponent(orderId)}`, {
       method: 'DELETE',
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(pin ? { 'X-Super-Admin-Pin': pin } : {})
     });
 
     if (!response.ok) {
@@ -239,13 +239,13 @@ export const updateProduct = async (productId, productData) => {
   }
 };
 
-export const deleteProduct = async (productId, sellerEmail = 'rohan.sivaa@gmail.com') => {
+export const deleteProduct = async (productId, pin = '') => {
   try {
     if (!productId) throw new Error('Product ID is required');
 
     const response = await fetchWithRetry(
       `${API_URL}/products/${encodeURIComponent(productId)}`,
-      { method: 'DELETE', headers: getAuthHeaders() }
+      { method: 'DELETE', headers: getAuthHeaders(pin ? { 'X-Super-Admin-Pin': pin } : {}) }
     );
 
     if (!response.ok) {
