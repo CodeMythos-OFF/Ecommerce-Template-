@@ -811,14 +811,19 @@ function App() {
       if (!result.isConfirmed) return;
 
       try {
+        const token = localStorage.getItem("shopmaster_session_token");
         await fetch(AUTH_API_URL + "/auth/logout", {
           method: "POST",
           credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
       } catch (error) {
         console.warn("Logout request failed:", error);
       }
 
+      // The persistent session token must also be removed. Otherwise Auth.jsx
+      // restores the account immediately after the dashboard signs out.
+      localStorage.removeItem("shopmaster_session_token");
       GoogleAuthService.signOut();
       sessionStorage.removeItem("authUser");
       sessionStorage.removeItem("authToken");
