@@ -736,7 +736,11 @@ app.put('/api/products/:id', async (req, res) => {
 
     const { year, cost, img, category, description, brand, stock, isActive } = req.body;
     const filter = { id: req.params.id };
-    if (!access.isSuperAdmin) filter.sellerEmail = access.seller.email;
+    if (access.isSuperAdmin && req.body.sellerEmail) {
+      filter.sellerEmail = String(req.body.sellerEmail).toLowerCase();
+    } else if (!access.isSuperAdmin) {
+      filter.sellerEmail = access.seller.email;
+    }
 
     const product = await Product.findOne(filter).maxTimeMS(5000);
     if (!product) return res.status(404).json({ error: 'Product not found or you do not have permission to edit it' });
@@ -771,7 +775,13 @@ app.delete('/api/products/:id', async (req, res) => {
       return res.status(403).json({ error: 'A valid super admin PIN is required' });
     }
 
-    const product = await Product.findOneAndDelete({ id: req.params.id }).maxTimeMS(5000);
+    const filter = { id: req.params.id };
+    const requestedSellerEmail = req.headers['x-product-seller-email'];
+    if (requestedSellerEmail) {
+      filter.sellerEmail = String(requestedSellerEmail).toLowerCase();
+    }
+
+    const product = await Product.findOneAndDelete(filter).maxTimeMS(5000);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
     res.json({ message: 'Product deleted successfully', product });
