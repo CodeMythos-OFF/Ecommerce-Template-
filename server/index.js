@@ -15,6 +15,9 @@ const ADMIN_EMAILS = [
   'codemythos@outlook.com',
   // Add more admin email addresses here.
 ].map((email) => email.toLowerCase());
+
+// Backward-compatible alias for any older code paths that still reference ADMIN_EMAIL.
+const ADMIN_EMAIL = ADMIN_EMAILS[0];
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
