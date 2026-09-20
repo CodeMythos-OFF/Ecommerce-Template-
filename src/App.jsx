@@ -6,6 +6,8 @@ import AdminPanel from "./AdminPanel";
 import OrderHistory from "./OrderHistory";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsOfService from "./TermsOfService";
+import SellerApplication from "./SellerApplication";
+import "./SellerApplication.css";
 import "./App.css";
 import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./cartService";
 import { trackView, createOrder, getProducts } from "./api";
@@ -25,6 +27,7 @@ const ROUTES = {
   "#login": "login",
   "#privacy": "privacy",
   "#terms": "terms",
+  "#sellerapply": "sellerapply",
 };
 
 const resolveRoute = (hash) => ROUTES[hash] || "home";
@@ -1450,6 +1453,21 @@ function App() {
                     </div>
                   </div>
                 </div>
+                {currentUser && !currentUser.isSeller && !currentUser.isSuperAdmin && (
+                  <div className="col-md-6" onClick={() => handlePageChange("sellerapply")} style={{ cursor: "pointer" }}>
+                    <div className="card shadow-sm border-0 h-100 action-card hover-lift">
+                      <div className="card-body d-flex align-items-center p-4">
+                        <div className="icon-box bg-info-soft text-info me-3">
+                          <i className="bi bi-shop-window" style={{ fontSize: "1.7rem" }}></i>
+                        </div>
+                        <div>
+                          <h6 className="fw-bold mb-1">Become a Seller</h6>
+                          <p className="text-muted small mb-0">Apply to sell your products</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {isAdmin && (
                   <div className="col-md-6" onClick={() => handlePageChange("admin")} style={{ cursor: "pointer" }}>
                     <div className="card shadow-sm border-0 h-100 action-card hover-lift">
@@ -1471,6 +1489,10 @@ function App() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div id="sellerapply" className={`page ${activePage === "sellerapply" ? "active" : ""}`}>
+        <SellerApplication currentUser={currentUser} />
       </div>
 
       <div id="privacy" className={`page ${activePage === "privacy" ? "active" : ""}`}>
