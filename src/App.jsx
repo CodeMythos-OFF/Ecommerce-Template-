@@ -290,9 +290,11 @@ function App() {
       try {
         // The server-side HttpOnly cookie is the source of truth after a refresh.
         // Do not rely only on sessionStorage, because browser/session state can be cleared.
+        const token = localStorage.getItem("shopmaster_session_token");
         const response = await fetch(`${AUTH_API_URL}/auth/me`, {
           method: "GET",
           credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
           signal: controller.signal,
         });
