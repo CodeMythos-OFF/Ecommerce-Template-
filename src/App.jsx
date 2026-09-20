@@ -730,6 +730,11 @@ function App() {
       setCurrentUser(userData);
       setIsAdmin(userData.isAdmin === true);
       setCartItems(getCart(userData.email));
+
+      // Always return to the home page after a successful sign-in.
+      window.location.hash = "#home";
+      setActivePage("home");
+
       Swal.fire({
         icon: "success",
         title: "Welcome!",
