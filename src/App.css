@@ -1187,3 +1187,238 @@
     text-align: center;
   }
 }
+
+/* =========================================================
+   MOBILE-FIRST SHOPPING EXPERIENCE
+   ========================================================= */
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img {
+  max-width: 100%;
+}
+
+@media (max-width: 767.98px) {
+  body {
+    font-size: 15px;
+    -webkit-text-size-adjust: 100%;
+    padding-bottom: 72px;
+  }
+
+  .container,
+  .container-fluid {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* Keep product browsing compact and thumb-friendly. */
+  .row {
+    --bs-gutter-x: 8px;
+    --bs-gutter-y: 10px;
+  }
+
+  .row-cols-1 > * {
+    width: 50%;
+  }
+
+  .card {
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+
+  .card-img-top,
+  .product-card-slider .card-img-top {
+    width: 100%;
+    height: 155px !important;
+    object-fit: cover;
+  }
+
+  .card-body {
+    padding: 0.7rem;
+  }
+
+  .card-title {
+    font-size: 0.9rem;
+    line-height: 1.25;
+    margin-bottom: 0.35rem;
+  }
+
+  .product-brand {
+    font-size: 0.62rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .product-rating {
+    font-size: 0.75rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .product-rating .text-warning {
+    letter-spacing: 0;
+  }
+
+  .product-price-row {
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.3rem;
+  }
+
+  .product-price {
+    font-size: 1.05rem;
+  }
+
+  .product-mrp {
+    font-size: 0.75rem;
+  }
+
+  .product-shipping {
+    font-size: 0.68rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn-primary,
+  .btn-group .btn {
+    min-height: 42px;
+    font-size: 0.82rem;
+    padding: 0.55rem 0.45rem;
+  }
+
+  .category-section {
+    margin: 1.25rem 0 1.5rem;
+  }
+
+  .category-header {
+    margin-bottom: 0.65rem;
+  }
+
+  .category-title {
+    font-size: 1.05rem;
+  }
+
+  .category-viewall {
+    font-size: 0.8rem;
+  }
+
+  .slider-track {
+    gap: 8px;
+    padding: 0.25rem 0.1rem 0.75rem;
+    scrollbar-width: none;
+  }
+
+  .slider-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .product-slide {
+    width: 165px;
+  }
+
+  .product-slide .card-img-top {
+    height: 145px !important;
+  }
+
+  /* Search and filters stay easy to reach with one hand. */
+  .products-header {
+    gap: 0.55rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .mobile-filter-toggle {
+    min-height: 46px;
+    margin-bottom: 0.75rem;
+  }
+
+  .sort-dropdown,
+  #p .form-control {
+    min-height: 44px;
+  }
+
+  /* Cart must never create horizontal scrolling on phones. */
+  #Cart {
+    height: auto;
+    min-height: calc(100vh - 72px);
+    padding: 12px;
+  }
+
+  .cart-items {
+    width: 100%;
+    margin: 0;
+    min-height: 0;
+    border-radius: 12px;
+  }
+
+  .cart-summary {
+    font-size: 0.9rem;
+  }
+
+  /* Product details become a true single-column mobile page. */
+  #pdetails .card {
+    width: 100%;
+  }
+
+  #pdetails .card-body {
+    padding: 1rem;
+  }
+
+  #pdetails img {
+    width: 100%;
+    max-height: 360px;
+    object-fit: contain;
+  }
+
+  /* Checkout/dashboard/admin content can scroll horizontally inside its table only. */
+  table {
+    min-width: 600px;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .legal-page {
+    min-height: calc(100vh - 72px);
+  }
+
+  .site-footer {
+    margin-top: 1.5rem;
+    padding: 1.1rem 0 1.5rem;
+    margin-bottom: 72px;
+  }
+}
+
+@media (max-width: 390px) {
+  .row-cols-1 > * {
+    width: 50%;
+  }
+
+  .card-img-top,
+  .product-card-slider .card-img-top {
+    height: 135px !important;
+  }
+
+  .card-body {
+    padding: 0.6rem;
+  }
+
+  .card-title {
+    font-size: 0.82rem;
+  }
+
+  .product-price {
+    font-size: 0.98rem;
+  }
+
+  .product-slide {
+    width: 150px;
+  }
+}
