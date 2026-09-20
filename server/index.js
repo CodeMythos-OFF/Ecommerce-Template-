@@ -113,14 +113,14 @@ const setAuthCookie = (res, token) => {
   // SameSite=None by browsers with stricter cookie/privacy settings.
   res.setHeader(
     'Set-Cookie',
-    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax; Secure`
+    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=None; Secure`
   );
 };
 
 const clearAuthCookie = (res) => {
   res.setHeader(
     'Set-Cookie',
-    'shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure'
+    'shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=None; Secure'
   );
 };
 
