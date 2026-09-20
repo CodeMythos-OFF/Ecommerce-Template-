@@ -108,18 +108,19 @@ const parseCookies = (req) => {
 };
 
 const setAuthCookie = (res, token) => {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  // The frontend and API are different origins but share the same Vercel site.
+  // Lax is sufficient for same-site requests and is more broadly accepted than
+  // SameSite=None by browsers with stricter cookie/privacy settings.
   res.setHeader(
     'Set-Cookie',
-    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=None; Secure`
+    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax; Secure`
   );
 };
 
 const clearAuthCookie = (res) => {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
-    `shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=None; Secure`
+    'shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure'
   );
 };
 
