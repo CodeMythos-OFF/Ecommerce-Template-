@@ -12,7 +12,7 @@ const NAV_ICONS = {
   login: '🔓'
 };
 
-export default function Navigation({ activePage, onPageChange, search, setSearch, cartCount = 0 }) {
+export default function Navigation({ activePage, onPageChange, search, setSearch, cartCount = 0, currentUser: appUser = null }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -27,7 +27,7 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
     };
     window.addEventListener('userChanged', handleUserChange);
     return () => window.removeEventListener('userChanged', handleUserChange);
-  }, []);
+  }, [appUser]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
