@@ -725,7 +725,7 @@ function App() {
   const handleSignInSuccess = useCallback(
     (userData) => {
       setCurrentUser(userData);
-      setIsAdmin(userData.email === ADMIN_EMAIL);
+      setIsAdmin(userData.isAdmin === true);
       setCartItems(getCart(userData.email));
       Swal.fire({
         icon: "success",
