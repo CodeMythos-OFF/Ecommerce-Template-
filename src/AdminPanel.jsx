@@ -190,7 +190,8 @@ const AdminPanel = ({ currentUser }) => {
         img: '',
         category: '',
         brand: '',
-        description: ''
+        description: '',
+        sellerEmail: ''
       });
       setImagePreview(null);
 
@@ -968,17 +969,22 @@ const AdminPanel = ({ currentUser }) => {
                                 </div>
                               )}
                               <p className="mb-1 text-success fw-bold">₹{product.cost || 0}</p>
-                              <small className="text-muted">
+                              <small className="text-muted d-block">
                                 {product.category || 'No category'} • {product.year || 'N/A'}
+                              </small>
+                              <small className="text-muted">
+                                Seller: {product.sellerBusinessName || 'N/A'} • {product.sellerName || 'N/A'}
                               </small>
                             </div>
                             <div className="col-md-3 text-end">
                               <button className="btn btn-primary btn-sm me-1" onClick={() => handleEditProduct(product)} disabled={productLoading}>
                                 <i className="bi bi-pencil"></i> Edit
                               </button>
-                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProduct(product.id)} disabled={productLoading}>
-                                <i className="bi bi-trash"></i> Delete
-                              </button>
+                              {currentUser?.isSuperAdmin && (
+                                <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProduct(product.id)} disabled={productLoading}>
+                                  <i className="bi bi-trash"></i> Delete
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
