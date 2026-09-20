@@ -4,6 +4,9 @@ import './index.css'
 import App from './App.jsx'
 import AuthCallback from './pages/AuthCallback.jsx'
 
+console.info(`email:codemythos@outlook.com
+I only applied for brand verification in Google Cloud Console`)
+
 // Check if we're on the auth callback page
 const isAuthCallback = window.location.pathname === '/auth-callback' || 
                        window.location.pathname === '/auth-callback.html';
