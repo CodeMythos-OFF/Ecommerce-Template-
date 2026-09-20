@@ -111,6 +111,20 @@ const Auth = ({ onSignInSuccess, onSignInFailure }) => {
       controller.abort();
     };
   }, [applyUser, clearUser]);
+  // Keep the login page UI synchronized when the dashboard signs out.
+  useEffect(() => {
+    const handleExternalSignOut = () => {
+      clearUser();
+      setIsLoading(false);
+      setIsGoogleLoading(false);
+      setGoogleError('');
+      setGoogleReady(true);
+    };
+
+    window.addEventListener('authSignedOut', handleExternalSignOut);
+    return () => window.removeEventListener('authSignedOut', handleExternalSignOut);
+  }, [clearUser]);
+
   // Initialize Google once and render its button only once per mount.
   useEffect(() => {
     let cancelled = false;
