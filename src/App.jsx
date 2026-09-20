@@ -1088,7 +1088,9 @@ function App() {
         {selectedProduct && (() => {
           const product = selectedProduct;
           const rating = Number(product.averageRating || product.rating || 0);
-          const brand = getBrandName(product);
+          // Brand is the product brand entered in the Admin Panel.
+          // Do not fall back to the seller's personal name here.
+          const brand = (product.brand || "").trim();
           const shippingText = product.shippingEtaText || product.shippingText || product.shipping;
           const stock = Number.isFinite(Number(product.stock)) ? Number(product.stock) : null;
           const category = (product.category || "Product").toLowerCase();
@@ -1232,10 +1234,14 @@ function App() {
                   <div className="section-kicker">SELLER INFORMATION</div>
                   <div className="seller-heading">
                     <div className="seller-avatar"><i className="bi bi-shop"></i></div>
-                    <div><h2>{product.sellerBusinessName || "ShopMaster"}</h2><p>{product.sellerName || "Verified seller"}</p></div>
+                    <div>
+                      <h2>{product.sellerBusinessName || "Seller"}</h2>
+                      <p>{product.sellerName || "Seller name not provided"}</p>
+                    </div>
                   </div>
                   <div className="seller-facts">
-                    <span><i className="bi bi-patch-check"></i> Seller listing</span>
+                    <span><i className="bi bi-person-badge"></i> Seller ID: {product.sellerId || product.sellerEmail || "Not available"}</span>
+                    <span><i className="bi bi-envelope"></i> {product.sellerEmail || "Email not available"}</span>
                     <span><i className="bi bi-tag"></i> {product.category || "General"} category</span>
                   </div>
                 </section>
