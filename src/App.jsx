@@ -12,7 +12,7 @@ import { trackView, createOrder, getProducts } from "./api";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
 import Swal from "sweetalert2";
 
-const AUTH_API_URL = import.meta.env.VITE_API_URL || "https://shopmaster-backend.vercel.app/api";
+const AUTH_API_URL = import.meta.env.VITE_API_URL || "https://backend-cm-test.vercel.app/api";
 
 const ROUTES = {
   "#dashboard": "dashboard",
@@ -290,7 +290,7 @@ function App() {
       try {
         // The server-side HttpOnly cookie is the source of truth after a refresh.
         // Do not rely only on sessionStorage, because browser/session state can be cleared.
-        const response = await fetch(`AUTH_API_URL + "/auth/me" + `, {
+        const response = await fetch(`${AUTH_API_URL}/auth/me`, {
           method: "GET",
           credentials: "include",
           cache: "no-store",
