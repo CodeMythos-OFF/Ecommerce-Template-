@@ -1017,22 +1017,29 @@ app.post('/api/orders', async (req, res) => {
 
 app.get('/api/orders', async (req, res) => {
   try {
-    const { sellerEmail, limit } = req.query;
-    const orderLimit = parseInt(limit) || 50;
-    
-    let orders;
-    if (sellerEmail) {
-      orders = await Order.find({ 'products.sellerEmail': sellerEmail })
-        .sort({ createdAt: -1 })
-        .limit(orderLimit)
-        .maxTimeMS(5000);
+    const { sellerEmail, userEmail, limit } = req.query;
+    const orderLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) return res.status(401).json({ error: 'Authentication is required to view orders' });
+
+    const sessionEmail = sessionUser.email.toLowerCase();
+    const isSuperAdmin = sessionEmail === SUPER_ADMIN_EMAIL;
+    let filter = {};
+
+    if (userEmail) {
+      if (String(userEmail).toLowerCase() !== sessionEmail && !isSuperAdmin) {
+        return res.status(403).json({ error: 'You can only view your own order history' });
+      }
+      filter = { user: String(userEmail).toLowerCase() };
+    } else if (sellerEmail) {
+      const access = await getAccessContext(req);
+      if (!access?.canManageProducts) return res.status(403).json({ error: 'Approved seller or super admin access is required' });
+      filter = isSuperAdmin ? { 'products.sellerEmail': sellerEmail } : { 'products.sellerEmail': sessionEmail };
     } else {
-      orders = await Order.find()
-        .sort({ createdAt: -1 })
-        .limit(orderLimit)
-        .maxTimeMS(5000);
+      if (!isSuperAdmin) filter = { user: sessionEmail };
     }
-    
+
+    const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(orderLimit).maxTimeMS(5000);
     res.json(orders);
   } catch (error) {
     console.error('Get orders error:', error);
