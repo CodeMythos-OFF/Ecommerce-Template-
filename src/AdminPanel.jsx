@@ -699,6 +699,18 @@ const AdminPanel = ({ currentUser }) => {
                                   {order.address.city || 'N/A'}, {order.address.state || 'N/A'} {order.address.pincode || ''}
                                 </p>
                                 <p className="mb-1">{order.address.country || 'India'}</p>
+                                <div className="mt-3 p-3 rounded-3" style={{ background: '#f0f8ff', border: '1px solid #cfe8ff' }}>
+                                  <div className="fw-bold text-primary mb-1"><i className="bi bi-geo-alt-fill"></i> India Post DIGIPIN</div>
+                                  <div className="fs-5 fw-bold">{order.address.digipin || 'Not available'}</div>
+                                  {order.address.latitude != null && order.address.longitude != null && (
+                                    <div className="small text-muted mt-1">
+                                      Coordinates: {Number(order.address.latitude).toFixed(6)}, {Number(order.address.longitude).toFixed(6)}
+                                    </div>
+                                  )}
+                                  {order.address.accuracy != null && (
+                                    <div className="small text-muted">GPS accuracy: ~{Math.round(Number(order.address.accuracy))} m</div>
+                                  )}
+                                </div>
                               </>
                             ) : (
                               <p className="text-muted">Address not provided</p>
