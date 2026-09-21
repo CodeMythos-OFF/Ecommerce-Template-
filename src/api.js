@@ -132,13 +132,12 @@ export const getStats = async (sellerEmail = null) => {
   }
 };
 
-export const getOrders = async (limit = 50, sellerEmail = null) => {
+export const getOrders = async (limit = 50, sellerEmail = null, userEmail = null) => {
   try {
     let url = `${API_URL}/orders?limit=${limit}`;
-    if (sellerEmail) {
-      url += `&sellerEmail=${encodeURIComponent(sellerEmail)}`;
-    }
-    const response = await fetchWithRetry(url);
+    if (sellerEmail) url += `&sellerEmail=${encodeURIComponent(sellerEmail)}`;
+    if (userEmail) url += `&userEmail=${encodeURIComponent(userEmail)}`;
+    const response = await fetchWithRetry(url, { headers: getAuthHeaders() });
     if (!response.ok) throw new Error('Failed to get orders');
     return await response.json();
   } catch (error) {
