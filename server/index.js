@@ -306,7 +306,11 @@ const orderSchema = new mongoose.Schema({
     state: { type: String, required: true },
     pincode: { type: String, required: true },
     phone: { type: String, required: true },
-    country: { type: String }
+    country: { type: String },
+    digipin: { type: String },
+    latitude: { type: Number },
+    longitude: { type: Number },
+    accuracy: { type: Number }
   },
   createdAt: { type: Date, default: Date.now },
   status: { type: String, default: 'Order Placed' }
