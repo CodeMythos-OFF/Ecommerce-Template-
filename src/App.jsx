@@ -569,152 +569,230 @@ function App() {
   const handleCheckout = useCallback(async () => {
     if (!currentUser || cartItems.length === 0) return;
     const savedAddresses = getAddresses(currentUser.email);
+
     const { value: formValues } = await Swal.fire({
       title: "Delivery Address",
       html: `
-        <div style="text-align: left;">
+        <div style="text-align:left">
           ${savedAddresses.length > 0 ? `
             <div class="mb-3">
               <label class="form-label fw-bold">Select Saved Address</label>
               <select id="swal-address-select" class="form-select">
                 <option value="">-- Or Enter New Address --</option>
-                ${savedAddresses
-                  .map((addr) => `<option value="${addr.id}">${addr.name || "Address"} - ${addr.street}, ${addr.city}</option>`)
-                  .join("")}
+                ${savedAddresses.map((addr) => `<option value="${addr.id}">${addr.name || "Address"} - ${addr.street}, ${addr.city}</option>`).join("")}
               </select>
-            </div>
-            <div class="text-center my-2">OR</div>
-          ` : ""}
-          <button id="use-location-btn" class="btn btn-info w-100 mb-3">
-            <i class="bi bi-geo-alt-fill"></i> Use My Current Location
-          </button>
-          <div class="mb-3">
-            <label class="form-label fw-bold">Full Name *</label>
-            <input id="swal-name" class="form-control" placeholder="Your Name" required>
+            </div>` : ""}
+          <div class="d-flex gap-2 mb-3">
+            <button id="use-location-btn" class="btn btn-info flex-fill">
+              <i class="bi bi-crosshair"></i> Use Current Location
+            </button>
+            <button id="pick-map-btn" class="btn btn-outline-primary flex-fill">
+              <i class="bi bi-map"></i> Pick on Map
+            </button>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold">Phone Number *</label>
-            <input id="swal-phone" class="form-control" type="tel" placeholder="10-digit number" maxlength="10" required>
+          <div id="checkout-map-wrap" style="display:none;margin-bottom:1rem">
+            <div id="checkout-map" style="height:280px;border-radius:12px;overflow:hidden;border:1px solid #dee2e6"></div>
+            <div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> Tap/click the map to choose your delivery location, then press <strong>Use This Location</strong>.</div>
+            <button id="use-map-location-btn" class="btn btn-primary btn-sm w-100 mt-2" disabled>Use This Location</button>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold">Street/House No *</label>
-            <input id="swal-street" class="form-control" placeholder="Street address" required>
+          <div class="mb-3"><label class="form-label fw-bold">Full Name *</label><input id="swal-name" class="form-control" placeholder="Your Name" required></div>
+          <div class="mb-3"><label class="form-label fw-bold">Phone Number *</label><input id="swal-phone" class="form-control" type="tel" placeholder="10-digit number" maxlength="10" required></div>
+          <div class="mb-3"><label class="form-label fw-bold">Street/House No *</label><input id="swal-street" class="form-control" placeholder="Street address" required></div>
+          <div class="row">
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">City *</label><input id="swal-city" class="form-control" placeholder="City" required></div>
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">State *</label><input id="swal-state" class="form-control" placeholder="State" required></div>
           </div>
           <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label fw-bold">City *</label>
-              <input id="swal-city" class="form-control" placeholder="City" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label fw-bold">State *</label>
-              <input id="swal-state" class="form-control" placeholder="State" required>
-            </div>
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">PIN Code *</label><input id="swal-pincode" class="form-control" placeholder="6-digit PIN" maxlength="6" required></div>
+            <div class="col-md-6 mb-3"><label class="form-label fw-bold">Country</label><input id="swal-country" class="form-control" value="India" required></div>
           </div>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label fw-bold">PIN Code *</label>
-              <input id="swal-pincode" class="form-control" placeholder="6-digit PIN" maxlength="6" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label fw-bold">Country</label>
-              <input id="swal-country" class="form-control" value="India" required>
-            </div>
-          </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="swal-save-address">
-            <label class="form-check-label" for="swal-save-address">
-              Save this address for future orders
-            </label>
-          </div>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="swal-save-address"><label class="form-check-label" for="swal-save-address">Save this address for future orders</label></div>
         </div>
       `,
-      width: "600px",
+      width: "720px",
       showCancelButton: true,
       confirmButtonText: "Place Order",
       cancelButtonText: "Cancel",
       focusConfirm: false,
       didOpen: () => {
-        const addressSelect = document.getElementById("swal-address-select");
-        if (addressSelect) {
-          addressSelect.addEventListener("change", (e) => {
-            const selectedId = parseInt(e.target.value);
-            const selected = savedAddresses.find((a) => a.id === selectedId);
-            if (selected) {
-              document.getElementById("swal-name").value = selected.name || "";
-              document.getElementById("swal-phone").value = selected.phone || "";
-              document.getElementById("swal-street").value = selected.street || "";
-              document.getElementById("swal-city").value = selected.city || "";
-              document.getElementById("swal-state").value = selected.state || "";
-              document.getElementById("swal-pincode").value = selected.pincode || "";
-              document.getElementById("swal-country").value = selected.country || "India";
-            }
-          });
-        }
-        const locationBtn = document.getElementById("use-location-btn");
-        locationBtn.addEventListener("click", async (e) => {
-          e.preventDefault();
-          locationBtn.disabled = true;
-          locationBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Getting location...';
+        const loadLeaflet = () => new Promise((resolve, reject) => {
+          if (window.L) return resolve(window.L);
+          const existing = document.getElementById("shopmaster-leaflet-script");
+          if (existing) {
+            existing.addEventListener("load", () => resolve(window.L), { once: true });
+            existing.addEventListener("error", () => reject(new Error("Map library failed to load")), { once: true });
+            return;
+          }
+          const css = document.createElement("link");
+          css.rel = "stylesheet";
+          css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          css.id = "shopmaster-leaflet-css";
+          document.head.appendChild(css);
+          const script = document.createElement("script");
+          script.id = "shopmaster-leaflet-script";
+          script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          script.async = true;
+          script.onload = () => resolve(window.L);
+          script.onerror = () => reject(new Error("Map library failed to load"));
+          document.head.appendChild(script);
+        });
+
+        const fillAddress = (locationAddress) => {
+          document.getElementById("swal-street").value = locationAddress.street || "";
+          document.getElementById("swal-city").value = locationAddress.city || "";
+          document.getElementById("swal-state").value = locationAddress.state || "";
+          document.getElementById("swal-pincode").value = locationAddress.pincode || "";
+          document.getElementById("swal-country").value = locationAddress.country || "India";
+          if (locationAddress.fullAddress) document.getElementById("swal-street").value = locationAddress.fullAddress;
+        };
+
+        const reverseGeocode = async (lat, lon) => {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
+          if (!response.ok) throw new Error("Could not find an address for this location.");
+          const data = await response.json();
+          const a = data.address || {};
+          return {
+            fullAddress: data.display_name || "",
+            street: a.road || a.street || "",
+            city: a.city || a.town || a.village || a.municipality || "",
+            state: a.state || "",
+            pincode: a.postcode || "",
+            country: a.country || "India",
+            latitude: lat,
+            longitude: lon
+          };
+        };
+
+        let map = null;
+        let marker = null;
+        let selectedLocation = null;
+
+        const showMap = async () => {
+          const wrap = document.getElementById("checkout-map-wrap");
+          wrap.style.display = "block";
+          const useBtn = document.getElementById("use-map-location-btn");
+          useBtn.disabled = true;
           try {
-            const locationAddress = await getLocationAddress();
-            document.getElementById("swal-street").value = locationAddress.street || "";
-            document.getElementById("swal-city").value = locationAddress.city || "";
-            document.getElementById("swal-state").value = locationAddress.state || "";
-            document.getElementById("swal-pincode").value = locationAddress.pincode || "";
-            document.getElementById("swal-country").value = locationAddress.country || "India";
-            locationBtn.innerHTML = '<i class="bi bi-check-circle"></i> Location Loaded!';
-            locationBtn.classList.remove("btn-info");
-            locationBtn.classList.add("btn-success");
+            const L = await loadLeaflet();
+            if (!map) {
+              const mapCenter = [20.5937, 78.9629];
+              map = L.map("checkout-map").setView(mapCenter, 5);
+              L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap contributors"
+              }).addTo(map);
+              map.on("click", async (event) => {
+                const { lat, lng } = event.latlng;
+                if (marker) marker.setLatLng([lat, lng]);
+                else marker = L.marker([lat, lng]).addTo(map);
+                useBtn.disabled = true;
+                useBtn.textContent = "Finding address...";
+                try {
+                  selectedLocation = await reverseGeocode(lat, lng);
+                  useBtn.disabled = false;
+                  useBtn.textContent = "Use This Location";
+                } catch (error) {
+                  useBtn.textContent = "Address lookup failed";
+                  Swal.showValidationMessage(error.message);
+                }
+              });
+            }
+            setTimeout(() => map.invalidateSize(), 100);
           } catch (error) {
             Swal.showValidationMessage(error.message);
-            locationBtn.disabled = false;
-            locationBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i> Use My Current Location';
+          }
+        };
+
+        document.getElementById("pick-map-btn").addEventListener("click", (event) => {
+          event.preventDefault();
+          showMap();
+        });
+
+        document.getElementById("use-map-location-btn").addEventListener("click", (event) => {
+          event.preventDefault();
+          if (!selectedLocation) return;
+          fillAddress(selectedLocation);
+          document.getElementById("checkout-map-wrap").style.display = "none";
+        });
+
+        document.getElementById("use-location-btn").addEventListener("click", async (event) => {
+          event.preventDefault();
+          const button = event.currentTarget;
+          button.disabled = true;
+          button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Finding location...';
+          try {
+            const locationAddress = await getLocationAddress();
+            fillAddress(locationAddress);
+            if (map && locationAddress.latitude && locationAddress.longitude) {
+              map.setView([locationAddress.latitude, locationAddress.longitude], 16);
+              if (marker) marker.setLatLng([locationAddress.latitude, locationAddress.longitude]);
+              else marker = window.L.marker([locationAddress.latitude, locationAddress.longitude]).addTo(map);
+            }
+            button.innerHTML = '<i class="bi bi-check-circle"></i> Location selected';
+          } catch (error) {
+            Swal.showValidationMessage(error.message);
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-crosshair"></i> Use Current Location';
           }
         });
+
+        const addressSelect = document.getElementById("swal-address-select");
+        if (addressSelect) {
+          addressSelect.addEventListener("change", (event) => {
+            const selected = savedAddresses.find((a) => a.id === Number(event.target.value));
+            if (!selected) return;
+            document.getElementById("swal-name").value = selected.name || "";
+            document.getElementById("swal-phone").value = selected.phone || "";
+            document.getElementById("swal-street").value = selected.street || "";
+            document.getElementById("swal-city").value = selected.city || "";
+            document.getElementById("swal-state").value = selected.state || "";
+            document.getElementById("swal-pincode").value = selected.pincode || "";
+            document.getElementById("swal-country").value = selected.country || "India";
+          });
+        }
       },
       preConfirm: () => {
-        const name = document.getElementById("swal-name").value;
-        const phone = document.getElementById("swal-phone").value;
-        const street = document.getElementById("swal-street").value;
-        const city = document.getElementById("swal-city").value;
-        const state = document.getElementById("swal-state").value;
-        const pincode = document.getElementById("swal-pincode").value;
-        const country = document.getElementById("swal-country").value;
+        const name = document.getElementById("swal-name").value.trim();
+        const phone = document.getElementById("swal-phone").value.trim();
+        const street = document.getElementById("swal-street").value.trim();
+        const city = document.getElementById("swal-city").value.trim();
+        const state = document.getElementById("swal-state").value.trim();
+        const pincode = document.getElementById("swal-pincode").value.trim();
+        const country = document.getElementById("swal-country").value.trim();
         const saveAddress = document.getElementById("swal-save-address").checked;
         if (!name || !phone || !street || !city || !state || !pincode) {
           Swal.showValidationMessage("Please fill all required fields");
           return false;
         }
-        if (phone.length !== 10 || !/^\d+$/.test(phone)) {
+        if (!/^\d{10}$/.test(phone)) {
           Swal.showValidationMessage("Please enter a valid 10-digit phone number");
           return false;
         }
-        if (pincode.length !== 6 || !/^\d+$/.test(pincode)) {
+        if (!/^\d{6}$/.test(pincode)) {
           Swal.showValidationMessage("Please enter a valid 6-digit PIN code");
           return false;
         }
         return { name, phone, street, city, state, pincode, country, saveAddress };
-      },
+      }
     });
 
     if (!formValues) return;
-    if (formValues.saveAddress) {
-      addAddress(currentUser.email, formValues);
-    }
+    if (formValues.saveAddress) addAddress(currentUser.email, formValues);
+
     try {
       const orderData = {
         user: currentUser.email,
         userName: currentUser.name,
         items: cartItems.length,
-        subtotal: subtotal,
-        shippingAmount: shippingAmount,
+        subtotal,
+        shippingAmount,
         total: totalPrice,
         products: groupedCart.map((item) => ({
           name: item.id,
           quantity: item.quantity,
           price: item.cost,
           sellerEmail: item.sellerEmail || "rohan.sivaa@gmail.com",
-          sellerName: item.sellerName || "Rohan",
+          sellerName: item.sellerName || "Rohan"
         })),
         cart: groupedCart.map((item) => ({
           id: item.id,
@@ -722,7 +800,7 @@ function App() {
           img: item.img,
           brand: item.brand || item.sellerBusinessName || item.sellerName,
           category: item.category,
-          quantity: item.quantity,
+          quantity: item.quantity
         })),
         address: {
           name: formValues.name,
@@ -731,8 +809,8 @@ function App() {
           city: formValues.city,
           state: formValues.state,
           pincode: formValues.pincode,
-          country: formValues.country,
-        },
+          country: formValues.country
+        }
       };
 
       await createOrder(orderData);
@@ -740,22 +818,13 @@ function App() {
       Swal.fire({
         icon: "success",
         title: "Order Placed!",
-        html: `
-          <p>Your order of <strong>₹${totalPrice}</strong> has been placed successfully!</p>
-          <div class="text-start mt-3 p-3" style="background: #f8f9fa; border-radius: 8px;">
-            <small class="text-muted d-block mb-1"><strong>Checkout Summary:</strong></small>
+        html: `<p>Your order of <strong>₹${totalPrice}</strong> has been placed successfully!</p>
+          <div class="text-start mt-3 p-3" style="background:#f8f9fa;border-radius:8px">
             <div class="d-flex justify-content-between small"><span>Subtotal:</span><span>₹${subtotal}</span></div>
             <div class="d-flex justify-content-between small"><span>Shipping (5%):</span><span>₹${shippingAmount}</span></div>
             <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-1"><span>Total:</span><span>₹${totalPrice}</span></div>
-            <small class="text-muted d-block mt-2"><strong>Delivery Address:</strong></small>
-            <small>${formValues.name}</small><br>
-            <small>${formValues.phone}</small><br>
-            <small>${formValues.street}, ${formValues.city}</small><br>
-            <small>${formValues.state} - ${formValues.pincode}</small>
-          </div>
-          <small class="text-muted d-block mt-3">☁️ Order saved to database & email sent!</small>
-        `,
-        confirmButtonText: "OK",
+          </div>`,
+        confirmButtonText: "OK"
       }).then(() => {
         setCartItems([]);
         saveCart(currentUser.email, []);
@@ -763,15 +832,9 @@ function App() {
       });
     } catch (error) {
       console.error("Error saving order:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Order Failed",
-        text: error.message || "Failed to place order. Please try again.",
-        confirmButtonText: "OK",
-      });
+      Swal.fire({ icon: "error", title: "Order Failed", text: error.message || "Failed to place order. Please try again." });
     }
   }, [currentUser, cartItems, totalPrice, subtotal, shippingAmount, groupedCart, handlePageChange]);
-
   const handleSignInSuccess = useCallback(
     (userData) => {
       setCurrentUser(userData);
