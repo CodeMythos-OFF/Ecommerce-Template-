@@ -329,7 +329,78 @@ const statsSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-const Stats = mongoose.model('Stats', statsSchema);
+const Stats = mongoose.model('Stats', statsSchema);\n\nconst emailTemplateSchema = new mongoose.Schema({
+  key: { type: String, unique: true, default: 'welcome-signin' },
+  enabled: { type: Boolean, default: true },
+  subject: { type: String, default: 'Thanks for signing in to ShopMaster!' },
+  html: { type: String, default: '<h1>Welcome to ShopMaster, {{name}}!</h1><p>Thanks for signing in. We are happy to have you with us.</p><p>Your account: {{email}}</p>' },
+  updatedAt: { type: Date, default: Date.now }
+});
+const EmailTemplate = mongoose.model('EmailTemplate', emailTemplateSchema);
+
+const DEFAULT_WELCOME_EMAIL = {
+  enabled: true,
+  subject: 'Thanks for signing in to ShopMaster, {{name}}!',
+  html: '<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Welcome to ShopMaster, {{name}} 👋</h2><p>Thanks for signing in to your ShopMaster account.</p><p>We appreciate you being part of our community.</p><p><strong>Account:</strong> {{email}}</p><p>Happy shopping!<br>— ShopMaster</p></div>'
+};
+
+const escapeEmailHtml = (value = '') => String(value)
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;');
+
+const renderEmailTemplate = (template, user) => {
+  const replacements = {
+    '{{name}}': escapeEmailHtml(user.name || 'there'),
+    '{{email}}': escapeEmailHtml(user.email || ''),
+    '{{businessName}}': escapeEmailHtml(user.sellerBusinessName || 'ShopMaster')
+  };
+  return Object.entries(replacements).reduce(
+    (html, [key, value]) => html.replaceAll(key, value),
+    template
+  );
+};
+
+const sendWelcomeEmail = async (user) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  if (!apiKey || !from || !user?.email) {
+    console.warn('Welcome email skipped: configure RESEND_API_KEY and EMAIL_FROM.');
+    return { sent: false, skipped: true };
+  }
+
+  try {
+    const templateDoc = await EmailTemplate.findOne({ key: 'welcome-signin' }).lean().maxTimeMS(5000);
+    const template = templateDoc || DEFAULT_WELCOME_EMAIL;
+    if (template.enabled === false) return { sent: false, disabled: true };
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from,
+        to: [user.email],
+        subject: renderEmailTemplate(template.subject || DEFAULT_WELCOME_EMAIL.subject, user),
+        html: renderEmailTemplate(template.html || DEFAULT_WELCOME_EMAIL.html, user)
+      })
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(`Resend API ${response.status}: ${details.slice(0, 300)}`);
+    }
+
+    return { sent: true };
+  } catch (error) {
+    console.error('Welcome email failed:', error.message);
+    return { sent: false, error: error.message };
+  }
+};
 
 // Initialize all data
 const initializeData = async () => {
@@ -356,6 +427,12 @@ const initializeData = async () => {
       superAdmin.updatedAt = new Date();
       await superAdmin.save();
       console.log('👑 CodeMythos seller promoted to super admin');
+    }
+
+    const emailTemplate = await EmailTemplate.findOne({ key: 'welcome-signin' });
+    if (!emailTemplate) {
+      await EmailTemplate.create({ key: 'welcome-signin', ...DEFAULT_WELCOME_EMAIL });
+      console.log('✉️ Welcome sign-in email template initialized');
     }
 
     const count = await Product.countDocuments();
@@ -494,7 +571,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok', 
     message: 'Server is running',
     database: isConnected ? 'connected' : 'connecting...',
-    email: 'disabled'
+    email: process.env.RESEND_API_KEY && process.env.EMAIL_FROM ? 'configured' : 'not configured'
   });
 });
 
@@ -539,10 +616,61 @@ app.post('/api/auth/google/verify', async (req, res) => {
 
     const sessionToken = createSessionToken(user);
     setAuthCookie(res, sessionToken);
+
+    // Send the configurable welcome email after a successful Google sign-in.
+    // Email failures never block authentication.
+    await sendWelcomeEmail(user);
+
     return res.json({ success: true, user, sessionToken });
   } catch (error) {
     console.error('Google ID token verification failed:', error.message);
     return res.status(401).json({ success: false, error: 'Invalid Google credential' });
+  }
+});
+
+app.get('/api/admin/email-template', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access is required' });
+    }
+
+    const template = await EmailTemplate.findOne({ key: 'welcome-signin' }).lean().maxTimeMS(5000);
+    return res.json(template || { key: 'welcome-signin', ...DEFAULT_WELCOME_EMAIL });
+  } catch (error) {
+    console.error('Email template fetch error:', error.message);
+    return res.status(500).json({ error: 'Failed to load email template' });
+  }
+});
+
+app.put('/api/admin/email-template', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access is required' });
+    }
+
+    const { enabled, subject, html } = req.body || {};
+    if (!String(subject || '').trim() || !String(html || '').trim()) {
+      return res.status(400).json({ error: 'Subject and HTML template are required' });
+    }
+
+    const template = await EmailTemplate.findOneAndUpdate(
+      { key: 'welcome-signin' },
+      {
+        key: 'welcome-signin',
+        enabled: enabled !== false,
+        subject: String(subject).trim().slice(0, 200),
+        html: String(html).trim().slice(0, 50000),
+        updatedAt: new Date()
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    return res.json({ success: true, template });
+  } catch (error) {
+    console.error('Email template update error:', error.message);
+    return res.status(500).json({ error: 'Failed to save email template' });
   }
 });
 
