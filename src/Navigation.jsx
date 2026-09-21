@@ -19,12 +19,13 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
   const userMenuRef = useRef(null);
 
   useEffect(() => {
-    const user = getCurrentUser();
+    const user = appUser || getCurrentUser();
     setCurrentUser(user);
+
     const handleUserChange = () => {
-      const updatedUser = getCurrentUser();
-      setCurrentUser(updatedUser);
+      setCurrentUser(appUser || getCurrentUser());
     };
+
     window.addEventListener('userChanged', handleUserChange);
     return () => window.removeEventListener('userChanged', handleUserChange);
   }, [appUser]);
