@@ -677,7 +677,11 @@ function App() {
           city: formValues.city,
           state: formValues.state,
           pincode: formValues.pincode,
-          country: formValues.country
+          country: formValues.country,
+          digipin: formValues.digipin,
+          latitude: formValues.latitude,
+          longitude: formValues.longitude,
+          accuracy: formValues.accuracy
         }
       };
 
