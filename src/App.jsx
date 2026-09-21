@@ -582,19 +582,9 @@ function App() {
                 ${savedAddresses.map((addr) => `<option value="${addr.id}">${addr.name || "Address"} - ${addr.street}, ${addr.city}</option>`).join("")}
               </select>
             </div>` : ""}
-          <div class="d-flex gap-2 mb-3">
-            <button id="use-location-btn" class="btn btn-info flex-fill">
-              <i class="bi bi-crosshair"></i> Use Current Location
-            </button>
-            <button id="pick-map-btn" class="btn btn-outline-primary flex-fill">
-              <i class="bi bi-map"></i> Pick on Map
-            </button>
-          </div>
-          <div id="checkout-map-wrap" style="display:none;margin-bottom:1rem">
-            <div id="checkout-map" style="height:280px;border-radius:12px;overflow:hidden;border:1px solid #dee2e6"></div>
-            <div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> Tap/click the map to choose your delivery location, then press <strong>Use This Location</strong>.</div>
-            <button id="use-map-location-btn" class="btn btn-primary btn-sm w-100 mt-2" disabled>Use This Location</button>
-          </div>
+          <div class="p-3 mb-3 rounded-3" style="background:#f0f8ff;border:1px solid #cfe8ff"><div class="fw-bold"><i class="bi bi-geo-alt-fill text-primary"></i> India Post DIGIPIN</div><div class="small text-muted mt-1">Use high-accuracy device location to generate a 10-character DIGIPIN. No Google Maps or billing is required.</div></div>
+          <button id="use-location-btn" class="btn btn-primary w-100 mb-3"><i class="bi bi-crosshair"></i> Get My DIGIPIN</button>
+          <div id="digipin-result" class="d-none p-3 mb-3 rounded-3 text-center" style="background:#f8f9fa;border:1px solid #dee2e6"><div class="small text-muted">Delivery location</div><div id="digipin-value" class="fw-bold fs-4">—</div><div id="digipin-accuracy" class="small text-muted mt-1"></div><div id="digipin-coordinates" class="small text-muted"></div></div>
           <div class="mb-3"><label class="form-label fw-bold">Full Name *</label><input id="swal-name" class="form-control" placeholder="Your Name" required></div>
           <div class="mb-3"><label class="form-label fw-bold">Phone Number *</label><input id="swal-phone" class="form-control" type="tel" placeholder="10-digit number" maxlength="10" required></div>
           <div class="mb-3"><label class="form-label fw-bold">Street/House No *</label><input id="swal-street" class="form-control" placeholder="Street address" required></div>
@@ -615,141 +605,14 @@ function App() {
       cancelButtonText: "Cancel",
       focusConfirm: false,
       didOpen: () => {
-        const loadLeaflet = () => new Promise((resolve, reject) => {
-          if (window.L) return resolve(window.L);
-          const existing = document.getElementById("shopmaster-leaflet-script");
-          if (existing) {
-            existing.addEventListener("load", () => resolve(window.L), { once: true });
-            existing.addEventListener("error", () => reject(new Error("Map library failed to load")), { once: true });
-            return;
-          }
-          const css = document.createElement("link");
-          css.rel = "stylesheet";
-          css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-          css.id = "shopmaster-leaflet-css";
-          document.head.appendChild(css);
-          const script = document.createElement("script");
-          script.id = "shopmaster-leaflet-script";
-          script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-          script.async = true;
-          script.onload = () => resolve(window.L);
-          script.onerror = () => reject(new Error("Map library failed to load"));
-          document.head.appendChild(script);
-        });
-
-        const fillAddress = (locationAddress) => {
-          document.getElementById("swal-street").value = locationAddress.street || "";
-          document.getElementById("swal-city").value = locationAddress.city || "";
-          document.getElementById("swal-state").value = locationAddress.state || "";
-          document.getElementById("swal-pincode").value = locationAddress.pincode || "";
-          document.getElementById("swal-country").value = locationAddress.country || "India";
-          if (locationAddress.fullAddress) document.getElementById("swal-street").value = locationAddress.fullAddress;
-        };
-
-        const reverseGeocode = async (lat, lon) => {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
-          if (!response.ok) throw new Error("Could not find an address for this location.");
-          const data = await response.json();
-          const a = data.address || {};
-          return {
-            fullAddress: data.display_name || "",
-            street: a.road || a.street || "",
-            city: a.city || a.town || a.village || a.municipality || "",
-            state: a.state || "",
-            pincode: a.postcode || "",
-            country: a.country || "India",
-            latitude: lat,
-            longitude: lon
-          };
-        };
-
-        let map = null;
-        let marker = null;
-        let selectedLocation = null;
-
-        const showMap = async () => {
-          const wrap = document.getElementById("checkout-map-wrap");
-          wrap.style.display = "block";
-          const useBtn = document.getElementById("use-map-location-btn");
-          useBtn.disabled = true;
-          try {
-            const L = await loadLeaflet();
-            if (!map) {
-              const mapCenter = [20.5937, 78.9629];
-              map = L.map("checkout-map").setView(mapCenter, 5);
-              L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                maxZoom: 19,
-                attribution: "&copy; OpenStreetMap contributors"
-              }).addTo(map);
-              map.on("click", async (event) => {
-                const { lat, lng } = event.latlng;
-                if (marker) marker.setLatLng([lat, lng]);
-                else marker = L.marker([lat, lng]).addTo(map);
-                useBtn.disabled = true;
-                useBtn.textContent = "Finding address...";
-                try {
-                  selectedLocation = await reverseGeocode(lat, lng);
-                  useBtn.disabled = false;
-                  useBtn.textContent = "Use This Location";
-                } catch (error) {
-                  useBtn.textContent = "Address lookup failed";
-                  Swal.showValidationMessage(error.message);
-                }
-              });
-            }
-            setTimeout(() => map.invalidateSize(), 100);
-          } catch (error) {
-            Swal.showValidationMessage(error.message);
-          }
-        };
-
-        document.getElementById("pick-map-btn").addEventListener("click", (event) => {
-          event.preventDefault();
-          showMap();
-        });
-
-        document.getElementById("use-map-location-btn").addEventListener("click", (event) => {
-          event.preventDefault();
-          if (!selectedLocation) return;
-          fillAddress(selectedLocation);
-          document.getElementById("checkout-map-wrap").style.display = "none";
-        });
-
+        const showPin = (x) => { document.getElementById("digipin-result").classList.remove("d-none"); document.getElementById("digipin-value").textContent = x.digipin; document.getElementById("digipin-accuracy").textContent = x.accuracy ? `Device accuracy: ~${x.accuracy} m` : "Device accuracy unavailable"; document.getElementById("digipin-coordinates").textContent = `Coordinates: ${x.latitude.toFixed(6)}, ${x.longitude.toFixed(6)}`; };
         document.getElementById("use-location-btn").addEventListener("click", async (event) => {
-          event.preventDefault();
-          const button = event.currentTarget;
-          button.disabled = true;
-          button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Finding location...';
-          try {
-            const locationAddress = await getLocationAddress();
-            fillAddress(locationAddress);
-            if (map && locationAddress.latitude && locationAddress.longitude) {
-              map.setView([locationAddress.latitude, locationAddress.longitude], 16);
-              if (marker) marker.setLatLng([locationAddress.latitude, locationAddress.longitude]);
-              else marker = window.L.marker([locationAddress.latitude, locationAddress.longitude]).addTo(map);
-            }
-            button.innerHTML = '<i class="bi bi-check-circle"></i> Location selected';
-          } catch (error) {
-            Swal.showValidationMessage(error.message);
-            button.disabled = false;
-            button.innerHTML = '<i class="bi bi-crosshair"></i> Use Current Location';
-          }
+          event.preventDefault(); const button = event.currentTarget; button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Getting location...';
+          try { const location = await getLocationAddress(); window.__shopmasterDigipinLocation = location; showPin(location); button.innerHTML = '<i class="bi bi-check-circle"></i> DIGIPIN captured'; }
+          catch (error) { Swal.showValidationMessage(error.message); button.disabled = false; button.innerHTML = '<i class="bi bi-crosshair"></i> Get My DIGIPIN'; }
         });
-
-        const addressSelect = document.getElementById("swal-address-select");
-        if (addressSelect) {
-          addressSelect.addEventListener("change", (event) => {
-            const selected = savedAddresses.find((a) => a.id === Number(event.target.value));
-            if (!selected) return;
-            document.getElementById("swal-name").value = selected.name || "";
-            document.getElementById("swal-phone").value = selected.phone || "";
-            document.getElementById("swal-street").value = selected.street || "";
-            document.getElementById("swal-city").value = selected.city || "";
-            document.getElementById("swal-state").value = selected.state || "";
-            document.getElementById("swal-pincode").value = selected.pincode || "";
-            document.getElementById("swal-country").value = selected.country || "India";
-          });
-        }
+        const select = document.getElementById("swal-address-select");
+        if (select) select.addEventListener("change", (event) => { const selected = savedAddresses.find((x) => x.id === Number(event.target.value)); if (!selected) return; ["name","phone","street","city","state","pincode","country"].forEach((key) => { const field = document.getElementById("swal-" + key); if (field) field.value = selected[key] || ""; }); if (selected.digipin) { window.__shopmasterDigipinLocation = selected; showPin(selected); } });
       },
       preConfirm: () => {
         const name = document.getElementById("swal-name").value.trim();
@@ -759,7 +622,7 @@ function App() {
         const state = document.getElementById("swal-state").value.trim();
         const pincode = document.getElementById("swal-pincode").value.trim();
         const country = document.getElementById("swal-country").value.trim();
-        const saveAddress = document.getElementById("swal-save-address").checked;
+        const saveAddress = document.getElementById("swal-save-address").checked;\n        const location = window.__shopmasterDigipinLocation;\n        if (!location?.digipin) { Swal.showValidationMessage("Please tap Get My DIGIPIN first."); return false; }
         if (!name || !phone || !street || !city || !state || !pincode) {
           Swal.showValidationMessage("Please fill all required fields");
           return false;
@@ -772,7 +635,7 @@ function App() {
           Swal.showValidationMessage("Please enter a valid 6-digit PIN code");
           return false;
         }
-        return { name, phone, street, city, state, pincode, country, saveAddress };
+        return { name, phone, street, city, state, pincode, country, saveAddress, digipin: location.digipin, latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy };
       }
     });
 
