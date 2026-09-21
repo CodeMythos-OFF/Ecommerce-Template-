@@ -1515,7 +1515,7 @@ function App() {
 
       <div id="orderhistory" className={`page ${activePage === "orderhistory" ? "active" : ""}`}>
         {currentUser ? (
-          <OrderHistory />
+          <OrderHistory currentUser={currentUser} />
         ) : (
           <div className="container my-5">
             <div className="text-center">
