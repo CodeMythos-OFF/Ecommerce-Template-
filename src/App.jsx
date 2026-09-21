@@ -622,7 +622,12 @@ function App() {
         const state = document.getElementById("swal-state").value.trim();
         const pincode = document.getElementById("swal-pincode").value.trim();
         const country = document.getElementById("swal-country").value.trim();
-        const saveAddress = document.getElementById("swal-save-address").checked;\n        const location = window.__shopmasterDigipinLocation;\n        if (!location?.digipin) { Swal.showValidationMessage("Please tap Get My DIGIPIN first."); return false; }
+        const saveAddress = document.getElementById("swal-save-address").checked;
+        const location = window.__shopmasterDigipinLocation;
+        if (!location?.digipin) {
+          Swal.showValidationMessage("Please tap Get My DIGIPIN first.");
+          return false;
+        }
         if (!name || !phone || !street || !city || !state || !pincode) {
           Swal.showValidationMessage("Please fill all required fields");
           return false;
