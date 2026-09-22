@@ -864,7 +864,7 @@ const AdminPanel = ({ currentUser }) => {
                 <div className="alert alert-info">
                   <strong>Automatic emails:</strong> welcome, order confirmation, order status changes, seller applications, seller approval and seller access revocation.
                   <br />
-                  <small>Available variables include <code>{{name}}</code>, <code>{{email}}</code>, <code>{{orderId}}</code>, <code>{{total}}</code>, <code>{{status}}</code>, and <code>{{businessName}}</code>.</small>
+                  <small>Available variables include <code>{'{{name}}'}</code>, <code>{'{{email}}'}</code>, <code>{'{{orderId}}'}</code>, <code>{'{{total}}'}</code>, <code>{'{{status}}'}</code>, and <code>{'{{businessName}}'}</code>.</small>
                 </div>
                 <div className="d-flex flex-wrap gap-2 mb-4">
                   <button className="btn btn-outline-primary" onClick={async () => {
