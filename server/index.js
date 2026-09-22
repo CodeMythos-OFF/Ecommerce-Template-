@@ -339,6 +339,15 @@ const microsoftEmailSchema = new mongoose.Schema({
 });
 const MicrosoftEmail = mongoose.model('MicrosoftEmail', microsoftEmailSchema);
 
+// Store OAuth state server-side instead of relying on a cross-site cookie.
+// This avoids state loss caused by browser privacy/third-party cookie policies.
+const microsoftOAuthStateSchema = new mongoose.Schema({
+  state: { type: String, unique: true, required: true },
+  expiresAt: { type: Date, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 900 }
+});
+const MicrosoftOAuthState = mongoose.model('MicrosoftOAuthState', microsoftOAuthStateSchema);
+
 const emailTemplateSchema = new mongoose.Schema({
   key: { type: String, unique: true, required: true },
   name: String, subject: String, text: String, html: String,
@@ -640,22 +649,56 @@ app.get('/api/email/microsoft/authorize', async (req, res) => {
   try {
     const access = await getAccessContext(req);
     if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Only the super admin can connect the email account' });
-    const state = crypto.randomBytes(24).toString('hex');
+
+    // Keep OAuth state in MongoDB so the callback does not depend on a
+    // cross-site cookie surviving the Microsoft login redirect.
+    const state = crypto.randomBytes(32).toString('hex');
+    await MicrosoftOAuthState.create({
+      state,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
     const url = await createMicrosoftAuthUrl(state);
-    res.setHeader('Set-Cookie', `shopmaster_oauth_state=${state}; Max-Age=600; Path=/; HttpOnly; SameSite=Lax; Secure`);
     res.redirect(url);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) {
+    console.error('Microsoft authorization start failed:', error);
+    res.status(500).send(`Microsoft authorization could not start: ${error.message}`);
+  }
 });
 
 app.get('/api/email/microsoft/callback', async (req, res) => {
   try {
-    const cookies = parseCookies(req);
-    if (!req.query.code || !req.query.state || cookies.shopmaster_oauth_state !== req.query.state) return res.status(400).send('Microsoft authorization state is invalid or expired.');
-    const result = await exchangeMicrosoftCode(String(req.query.code));
-    await MicrosoftEmail.findOneAndUpdate({}, { accountEmail: result.account.username || result.account.homeAccountId, encryptedTokenCache: result.cache, updatedAt: new Date() }, { upsert: true, new: true });
-    res.setHeader('Set-Cookie', 'shopmaster_oauth_state=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+    const state = String(req.query.state || '');
+    const code = String(req.query.code || '');
+    if (!state || !code) {
+      return res.status(400).send('Microsoft authorization response is missing state or code.');
+    }
+
+    const stateRecord = await MicrosoftOAuthState.findOneAndDelete({
+      state,
+      expiresAt: { $gt: new Date() }
+    }).maxTimeMS(5000);
+
+    if (!stateRecord) {
+      return res.status(400).send('Microsoft authorization state is invalid or expired. Please start the connection again.');
+    }
+
+    const result = await exchangeMicrosoftCode(code);
+    await MicrosoftEmail.findOneAndUpdate(
+      {},
+      {
+        accountEmail: result.account.username || result.account.homeAccountId,
+        encryptedTokenCache: result.cache,
+        updatedAt: new Date()
+      },
+      { upsert: true, new: true }
+    );
+
     res.redirect((process.env.FRONTEND_PUBLIC_URL || 'https://testsampleindev.vercel.app') + '/#admin');
-  } catch (error) { res.status(500).send(`Microsoft email connection failed: ${error.message}`); }
+  } catch (error) {
+    console.error('Microsoft email callback failed:', error);
+    res.status(500).send(`Microsoft email connection failed: ${error.message}`);
+  }
 });
 
 app.get('/api/email/status', async (req, res) => {
