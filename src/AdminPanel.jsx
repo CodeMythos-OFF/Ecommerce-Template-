@@ -507,10 +507,10 @@ const AdminPanel = ({ currentUser }) => {
             <button className={`btn ${activeTab === 'sellers' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('sellers')}>
               <i className="bi bi-people"></i> Sellers & Approvals
             </button>
+            <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('emails')}>
+              <i className="bi bi-envelope"></i> Automated Emails
+            </button>
           </>
-          <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('emails')}>
-            <i className="bi bi-envelope"></i> Automated Emails
-          </button>
         )}
       </div>
 
