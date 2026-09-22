@@ -321,26 +321,6 @@ export const registerSeller = async (sellerData) => {
   }
 };
 
-export const getEmailTemplate = async () => {
-  const response = await fetchWithRetry(`${API_URL}/admin/email-template`, {
-    headers: getAuthHeaders()
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Failed to load email template');
-  return data;
-};
-
-export const updateEmailTemplate = async (template) => {
-  const response = await fetchWithRetry(`${API_URL}/admin/email-template`, {
-    method: 'PUT',
-    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(template)
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Failed to save email template');
-  return data;
-};
-
 export const getAllSellers = async () => {
   try {
     const response = await fetchWithRetry(`${API_URL}/sellers`, {
