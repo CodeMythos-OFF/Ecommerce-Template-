@@ -514,30 +514,162 @@ const AdminPanel = ({ currentUser }) => {
         )}
       </div>
 
+
       {activeTab === 'emails' && currentUser?.isSuperAdmin && (
         <div className="card shadow-sm border-0 p-4 mb-4">
           <h3>Microsoft Automated Emails</h3>
-          <p className="text-muted">Connect your personal Outlook.com account using Microsoft OAuth. Your Outlook password is never stored by ShopMaster.</p>
+          <p className="text-muted">
+            Connect your personal Outlook.com account using Microsoft OAuth. Your Outlook password is never stored by ShopMaster.
+          </p>
+
           <div className={`alert ${emailStatus.connected ? 'alert-success' : 'alert-warning'}`}>
-            <strong>Status:</strong> {emailStatus.connected ? `Connected to ${emailStatus.accountEmail || 'Microsoft account'}` : 'Not connected'}
+            <strong>Status:</strong>{' '}
+            {emailStatus.connected
+              ? `Connected to ${emailStatus.accountEmail || 'Microsoft account'}`
+              : 'Not connected'}
           </div>
-          <a className="btn btn-primary me-2" href={`${window.location.origin}/api/email/microsoft/authorize`}>Connect Microsoft Account</a>
-          <button className="btn btn-outline-secondary" onClick={async () => { try { setEmailStatus(await getMicrosoftEmailStatus()); } catch (e) { Swal.fire('Error', e.message, 'error'); } }}>Refresh</button>
-          {emailStatus.connected && <div className="mt-4">
-            <button className="btn btn-success mb-3" onClick={async () => {
-              const r = await Swal.fire({ title: 'Test email', input: 'email', inputValue: currentUser?.email || '', showCancelButton: true, confirmButtonText: 'Send' });
-              if (!r.isConfirmed) return;
-              try { await sendMicrosoftTestEmail(r.value); Swal.fire('Sent', 'Test email sent.', 'success'); } catch (e) { Swal.fire('Error', e.message, 'error'); }
-            }}>Send Test Email</button>
-            {emailTemplates.map(template => <div className="border rounded p-3 mb-3" key={template.key}>
-              <h5>{template.name}</h5>
-              <input className="form-control mb-2" value={template.subject || ''} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, subject:e.target.value} : t))} />
-              <textarea className="form-control mb-2" rows="3" value={template.text || ''} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, text:e.target.value} : t))} />
-              <textarea className="form-control mb-2" rows="5" value={template.html || ''} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, html:e.target.value} : t))} />
-              <label className="d-block mb-2"><input type="checkbox" className="form-check-input me-2" checked={template.enabled !== false} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, enabled:e.target.checked} : t))} />Enabled</label>
-              <button className="btn btn-sm btn-success" disabled={emailSaving} onClick={async () => { setEmailSaving(true); try { const r=await updateMicrosoftEmailTemplate(template.key, template); setEmailTemplates(v=>v.map(t=>t.key===template.key?r.template:t)); Swal.fire('Saved','Template updated.','success'); } catch(e) { Swal.fire('Error',e.message,'error'); } finally { setEmailSaving(false); } }}>Save Template</button>
-            </div>)}
-          </div>
+
+          <a
+            className="btn btn-primary me-2"
+            href={`${window.location.origin}/api/email/microsoft/authorize`}
+          >
+            Connect Microsoft Account
+          </a>
+
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={async () => {
+              try {
+                const status = await getMicrosoftEmailStatus();
+                setEmailStatus(status);
+              } catch (error) {
+                Swal.fire('Error', error.message || 'Failed to refresh email status', 'error');
+              }
+            }}
+          >
+            Refresh
+          </button>
+
+          {emailStatus.connected && (
+            <div className="mt-4">
+              <button
+                type="button"
+                className="btn btn-success mb-3"
+                onClick={async () => {
+                  const result = await Swal.fire({
+                    title: 'Test email',
+                    input: 'email',
+                    inputValue: currentUser?.email || '',
+                    showCancelButton: true,
+                    confirmButtonText: 'Send'
+                  });
+
+                  if (!result.isConfirmed || !result.value) return;
+
+                  try {
+                    await sendMicrosoftTestEmail(result.value);
+                    Swal.fire('Sent', 'Test email sent.', 'success');
+                  } catch (error) {
+                    Swal.fire('Error', error.message || 'Failed to send test email', 'error');
+                  }
+                }}
+              >
+                Send Test Email
+              </button>
+
+              {emailTemplates.map((template) => (
+                <div className="border rounded p-3 mb-3" key={template.key}>
+                  <h5>{template.name}</h5>
+
+                  <label className="form-label">Subject</label>
+                  <input
+                    className="form-control mb-2"
+                    value={template.subject || ''}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setEmailTemplates((items) =>
+                        items.map((item) =>
+                          item.key === template.key ? { ...item, subject: value } : item
+                        )
+                      );
+                    }}
+                  />
+
+                  <label className="form-label">Plain-text body</label>
+                  <textarea
+                    className="form-control mb-2"
+                    rows="3"
+                    value={template.text || ''}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setEmailTemplates((items) =>
+                        items.map((item) =>
+                          item.key === template.key ? { ...item, text: value } : item
+                        )
+                      );
+                    }}
+                  />
+
+                  <label className="form-label">HTML body</label>
+                  <textarea
+                    className="form-control mb-2"
+                    rows="5"
+                    value={template.html || ''}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setEmailTemplates((items) =>
+                        items.map((item) =>
+                          item.key === template.key ? { ...item, html: value } : item
+                        )
+                      );
+                    }}
+                  />
+
+                  <label className="d-block mb-2">
+                    <input
+                      type="checkbox"
+                      className="form-check-input me-2"
+                      checked={template.enabled !== false}
+                      onChange={(event) => {
+                        const enabled = event.target.checked;
+                        setEmailTemplates((items) =>
+                          items.map((item) =>
+                            item.key === template.key ? { ...item, enabled } : item
+                          )
+                        );
+                      }}
+                    />
+                    Enabled
+                  </label>
+
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-success"
+                    disabled={emailSaving}
+                    onClick={async () => {
+                      setEmailSaving(true);
+                      try {
+                        const result = await updateMicrosoftEmailTemplate(template.key, template);
+                        setEmailTemplates((items) =>
+                          items.map((item) =>
+                            item.key === template.key ? result.template : item
+                          )
+                        );
+                        Swal.fire('Saved', 'Template updated.', 'success');
+                      } catch (error) {
+                        Swal.fire('Error', error.message || 'Failed to save template', 'error');
+                      } finally {
+                        setEmailSaving(false);
+                      }
+                    }}
+                  >
+                    Save Template
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
