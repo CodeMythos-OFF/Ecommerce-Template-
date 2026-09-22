@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
+import { createMicrosoftAuthUrl, exchangeMicrosoftCode, getMicrosoftAccessToken, getMicrosoftRedirectUri, isMicrosoftEmailConfigured, sendMicrosoftEmail } from './microsoftEmailService.js';
 
 dotenv.config();
 
@@ -197,6 +198,7 @@ const connectDB = async () => {
 
     // Initialization is intentionally not awaited here. API requests should
     // not be blocked by seed/setup work during a Vercel cold start.
+    initializeEmailTemplates().catch((error) => console.error('Email template initialization error:', error.message));
     initializeData().catch((error) => {
       console.error('❌ Background data initialization error:', error.message);
     });
@@ -330,6 +332,55 @@ const statsSchema = new mongoose.Schema({
 });
 
 const Stats = mongoose.model('Stats', statsSchema);
+const microsoftEmailSchema = new mongoose.Schema({
+  accountEmail: { type: String, required: true },
+  encryptedTokenCache: { type: String, required: true },
+  updatedAt: { type: Date, default: Date.now }
+});
+const MicrosoftEmail = mongoose.model('MicrosoftEmail', microsoftEmailSchema);
+
+const emailTemplateSchema = new mongoose.Schema({
+  key: { type: String, unique: true, required: true },
+  name: String, subject: String, text: String, html: String,
+  enabled: { type: Boolean, default: true }, updatedAt: { type: Date, default: Date.now }
+});
+const EmailTemplate = mongoose.model('EmailTemplate', emailTemplateSchema);
+
+const DEFAULT_EMAIL_TEMPLATES = {
+  welcome: { name: 'Welcome email', subject: 'Welcome to ShopMaster', text: 'Hi {{name}},\n\nWelcome to ShopMaster. Your account {{email}} is ready.', html: '<h1>Welcome to ShopMaster</h1><p>Hi {{name}},</p><p>Your account {{email}} is ready.</p>' },
+  order_confirmation: { name: 'Order confirmation', subject: 'Order {{orderId}} confirmed', text: 'Your order {{orderId}} has been placed. Total: ₹{{total}}.', html: '<h2>Order confirmed</h2><p>Order <strong>{{orderId}}</strong> has been placed.</p><p>Total: ₹{{total}}</p>' },
+  order_status: { name: 'Order status', subject: 'Order {{orderId}} status updated', text: 'Order {{orderId}} status: {{status}}.', html: '<h2>Order update</h2><p>Order <strong>{{orderId}}</strong> status: {{status}}.</p>' },
+  seller_application: { name: 'Seller application', subject: 'Seller application received', text: 'Hi {{name}}, your seller application for {{businessName}} was received.', html: '<p>Hi {{name}},</p><p>Your seller application for <strong>{{businessName}}</strong> was received.</p>' },
+  seller_approved: { name: 'Seller approved', subject: 'Seller access approved', text: 'Your seller access for {{businessName}} has been approved.', html: '<p>Your seller access for <strong>{{businessName}}</strong> has been approved.</p>' },
+  seller_revoked: { name: 'Seller revoked', subject: 'Seller access updated', text: 'Seller access for {{businessName}} has been revoked.', html: '<p>Seller access for <strong>{{businessName}}</strong> has been revoked.</p>' }
+};
+
+const renderEmailTemplate = (value, variables) => String(value || '').replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, key) => variables?.[key] ?? '');
+
+const sendTemplateEmail = async (key, to, variables) => {
+  if (!to) return;
+  try {
+    const integration = await MicrosoftEmail.findOne().maxTimeMS(5000);
+    if (!integration) return;
+    const template = await EmailTemplate.findOne({ key }).maxTimeMS(5000) || DEFAULT_EMAIL_TEMPLATES[key];
+    if (!template || template.enabled === false) return;
+    const mail = await getMicrosoftAccessToken(integration.encryptedTokenCache);
+    await sendMicrosoftEmail({ accessToken: mail.accessToken, to, subject: renderEmailTemplate(template.subject, variables), text: renderEmailTemplate(template.text, variables), html: renderEmailTemplate(template.html, variables) });
+    integration.encryptedTokenCache = mail.cache;
+    integration.accountEmail = mail.account?.username || integration.accountEmail;
+    integration.updatedAt = new Date();
+    await integration.save();
+  } catch (error) {
+    console.error(`📧 Microsoft automated email error [${key}]:`, error.message);
+  }
+};
+
+const initializeEmailTemplates = async () => {
+  for (const [key, template] of Object.entries(DEFAULT_EMAIL_TEMPLATES)) {
+    await EmailTemplate.findOneAndUpdate({ key }, { $setOnInsert: { key, ...template, enabled: true, updatedAt: new Date() } }, { upsert: true });
+  }
+};
+
 
 // Initialize all data
 const initializeData = async () => {
@@ -537,6 +588,7 @@ app.post('/api/auth/google/verify', async (req, res) => {
     };
 
     const sessionToken = createSessionToken(user);
+    sendTemplateEmail('welcome', user.email, user);
     setAuthCookie(res, sessionToken);
     return res.json({ success: true, user, sessionToken });
   } catch (error) {
@@ -583,6 +635,70 @@ app.post('/api/auth/logout', (req, res) => {
 
 // ========== EMAIL ROUTES ==========
 
+
+app.get('/api/email/microsoft/authorize', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Only the super admin can connect the email account' });
+    const state = crypto.randomBytes(24).toString('hex');
+    const url = await createMicrosoftAuthUrl(state);
+    res.setHeader('Set-Cookie', `shopmaster_oauth_state=${state}; Max-Age=600; Path=/; HttpOnly; SameSite=Lax; Secure`);
+    res.redirect(url);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/email/microsoft/callback', async (req, res) => {
+  try {
+    const cookies = parseCookies(req);
+    if (!req.query.code || !req.query.state || cookies.shopmaster_oauth_state !== req.query.state) return res.status(400).send('Microsoft authorization state is invalid or expired.');
+    const result = await exchangeMicrosoftCode(String(req.query.code));
+    await MicrosoftEmail.findOneAndUpdate({}, { accountEmail: result.account.username || result.account.homeAccountId, encryptedTokenCache: result.cache, updatedAt: new Date() }, { upsert: true, new: true });
+    res.setHeader('Set-Cookie', 'shopmaster_oauth_state=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+    res.redirect((process.env.FRONTEND_PUBLIC_URL || 'https://testsampleindev.vercel.app') + '/#admin');
+  } catch (error) { res.status(500).send(`Microsoft email connection failed: ${error.message}`); }
+});
+
+app.get('/api/email/status', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    const integration = await MicrosoftEmail.findOne().select('accountEmail updatedAt').lean();
+    res.json({ configured: isMicrosoftEmailConfigured(), connected: Boolean(integration), accountEmail: integration?.accountEmail || null, updatedAt: integration?.updatedAt || null, redirectUri: getMicrosoftRedirectUri() });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/email/templates', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    res.json(await EmailTemplate.find().sort({ key: 1 }).maxTimeMS(5000));
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.put('/api/email/templates/:key', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    if (!DEFAULT_EMAIL_TEMPLATES[req.params.key]) return res.status(404).json({ error: 'Unknown email template' });
+    const template = await EmailTemplate.findOneAndUpdate({ key: req.params.key }, { $set: { subject: String(req.body.subject || ''), text: String(req.body.text || ''), html: String(req.body.html || ''), enabled: req.body.enabled !== false, updatedAt: new Date() } }, { new: true, upsert: true });
+    res.json({ success: true, template });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/email/test', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    const integration = await MicrosoftEmail.findOne();
+    if (!integration) return res.status(400).json({ error: 'Connect your Microsoft account first.' });
+    const mail = await getMicrosoftAccessToken(integration.encryptedTokenCache);
+    const to = String(req.body?.to || access.sessionUser.email).trim();
+    await sendMicrosoftEmail({ accessToken: mail.accessToken, to, subject: 'ShopMaster test email', text: 'Your ShopMaster Microsoft email connection is working.' });
+    integration.encryptedTokenCache = mail.cache; await integration.save();
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 // ========== SELLER ROUTES ==========
 
 app.post('/api/sellers/apply', async (req, res) => {
@@ -616,6 +732,8 @@ app.post('/api/sellers/apply', async (req, res) => {
       isApproved: false,
       isSuperAdmin: false
     });
+    sendTemplateEmail('seller_application', seller.email, seller);
+
     res.status(201).json({
       success: true,
       seller,
@@ -702,6 +820,8 @@ app.put('/api/sellers/:email/approve', async (req, res) => {
       seller.isSuperAdmin = true;
       await seller.save();
     }
+    sendTemplateEmail('seller_approved', seller.email, seller);
+
     res.json({ success: true, seller, message: 'Seller approved successfully' });
   } catch (error) {
     console.error('Approve seller error:', error);
@@ -730,6 +850,8 @@ app.put('/api/sellers/:email/revoke', async (req, res) => {
     if (!seller) {
       return res.status(404).json({ error: 'Seller not found' });
     }
+    sendTemplateEmail('seller_revoked', seller.email, seller);
+
     res.json({ success: true, seller, message: 'Seller access revoked' });
   } catch (error) {
     console.error('Revoke seller error:', error);
@@ -1006,6 +1128,8 @@ app.post('/api/orders', async (req, res) => {
     
     await stats.save();
 
+    sendTemplateEmail('order_confirmation', order.user, { name: order.userName, email: order.user, orderId: order.trackingId, total: order.total, status: order.status });
+
     res.status(201).json({ 
       order, 
       stats, 
@@ -1115,6 +1239,8 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
+
+    sendTemplateEmail('order_status', order.user, { name: order.userName, email: order.user, orderId: order.trackingId, total: order.total, status: order.status });
 
     res.json({ message: 'Order status updated successfully', order });
   } catch (error) {
