@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
+import { sendEmail, renderTemplate, isEmailConfigured, verifyEmailTransport } from './emailService.js';
 
 dotenv.config();
 
@@ -331,6 +332,85 @@ const statsSchema = new mongoose.Schema({
 
 const Stats = mongoose.model('Stats', statsSchema);
 
+const emailTemplateSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  subject: { type: String, required: true },
+  text: { type: String, required: true },
+  html: { type: String, required: true },
+  enabled: { type: Boolean, default: true },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const EmailTemplate = mongoose.model('EmailTemplate', emailTemplateSchema);
+
+const DEFAULT_EMAIL_TEMPLATES = {
+  welcome: {
+    name: 'Welcome email',
+    subject: 'Welcome to ShopMaster, {{name}}!',
+    text: 'Hi {{name}},\\n\\nWelcome to ShopMaster. Your account {{email}} is now ready to use.\\n\\nThanks,\\nShopMaster',
+    html: '<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px"><h1>Welcome to ShopMaster</h1><p>Hi {{name}},</p><p>Your account <strong>{{email}}</strong> is now ready to use.</p><p>Thanks,<br>ShopMaster</p></div>'
+  },
+  order_confirmation: {
+    name: 'Order confirmation',
+    subject: 'Order {{orderId}} confirmed — ShopMaster',
+    text: 'Hi {{name}},\\n\\nYour order {{orderId}} has been confirmed.\\nTotal: ₹{{total}}\\nStatus: {{status}}\\n\\nThanks for shopping with ShopMaster.',
+    html: '<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px"><h1>Order confirmed</h1><p>Hi {{name}},</p><p>Your order <strong>{{orderId}}</strong> has been confirmed.</p><p>Total: <strong>₹{{total}}</strong></p><p>Status: {{status}}</p><p>Thanks for shopping with ShopMaster.</p></div>'
+  },
+  order_status: {
+    name: 'Order status update',
+    subject: 'Order {{orderId}} is now {{status}}',
+    text: 'Hi {{name}},\\n\\nYour ShopMaster order {{orderId}} is now {{status}}.\\n\\nThank you.',
+    html: '<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px"><h1>Order update</h1><p>Hi {{name}},</p><p>Your order <strong>{{orderId}}</strong> is now <strong>{{status}}</strong>.</p><p>Thank you for shopping with ShopMaster.</p></div>'
+  },
+  seller_application: {
+    name: 'Seller application received',
+    subject: 'Seller application received — ShopMaster',
+    text: 'Hi {{name}},\\n\\nWe received your seller application for {{businessName}}. It is pending super admin approval.\\n\\nShopMaster',
+    html: '<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px"><h1>Application received</h1><p>Hi {{name}},</p><p>We received your seller application for <strong>{{businessName}}</strong>.</p><p>Your application is pending approval.</p></div>'
+  },
+  seller_approved: {
+    name: 'Seller approved',
+    subject: 'Your ShopMaster seller account is approved',
+    text: 'Hi {{name}},\\n\\nYour seller account for {{businessName}} has been approved. You can now manage your products.\\n\\nShopMaster',
+    html: '<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px"><h1>Seller approved</h1><p>Hi {{name}},</p><p>Your seller account for <strong>{{businessName}}</strong> has been approved.</p><p>You can now manage your products in ShopMaster.</p></div>'
+  },
+  seller_revoked: {
+    name: 'Seller access revoked',
+    subject: 'ShopMaster seller access update',
+    text: 'Hi {{name}},\\n\\nSeller access for {{businessName}} has been revoked by the super admin.\\n\\nShopMaster',
+    html: '<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px"><h1>Seller access update</h1><p>Hi {{name}},</p><p>Seller access for <strong>{{businessName}}</strong> has been revoked by the super admin.</p></div>'
+  }
+};
+
+const sendTemplateEmail = async (key, to, variables) => {
+  if (!to) return;
+  try {
+    const stored = await EmailTemplate.findOne({ key }).maxTimeMS(5000);
+    const defaults = DEFAULT_EMAIL_TEMPLATES[key];
+    const template = stored || defaults;
+    if (!template || template.enabled === false) return;
+    await sendEmail({
+      to,
+      subject: renderTemplate(template.subject, variables),
+      text: renderTemplate(template.text, variables),
+      html: renderTemplate(template.html, variables)
+    });
+  } catch (error) {
+    console.error(`📧 Automated email error [${key}]:`, error.message);
+  }
+};
+
+const initializeEmailTemplates = async () => {
+  for (const [key, template] of Object.entries(DEFAULT_EMAIL_TEMPLATES)) {
+    await EmailTemplate.findOneAndUpdate(
+      { key },
+      { $setOnInsert: { key, ...template, enabled: true, updatedAt: new Date() } },
+      { upsert: true, new: true }
+    ).maxTimeMS(5000);
+  }
+};
+
 // Initialize all data
 const initializeData = async () => {
   try {
@@ -357,6 +437,8 @@ const initializeData = async () => {
       await superAdmin.save();
       console.log('👑 CodeMythos seller promoted to super admin');
     }
+
+    await initializeEmailTemplates();
 
     const count = await Product.countDocuments();
     if (count === 0) {
@@ -539,6 +621,8 @@ app.post('/api/auth/google/verify', async (req, res) => {
     const sessionToken = createSessionToken(user);
     setAuthCookie(res, sessionToken);
 
+    sendTemplateEmail('welcome', user.email, user);
+
     return res.json({ success: true, user, sessionToken });
   } catch (error) {
     console.error('Google ID token verification failed:', error.message);
@@ -582,6 +666,77 @@ app.post('/api/auth/logout', (req, res) => {
   return res.json({ success: true });
 });
 
+// ========== EMAIL ROUTES ==========
+
+app.get('/api/email/status', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    let verified = false;
+    if (isEmailConfigured()) {
+      try {
+        await verifyEmailTransport();
+        verified = true;
+      } catch (error) {
+        return res.json({ configured: true, verified: false, error: error.message });
+      }
+    }
+    res.json({ configured: isEmailConfigured(), verified });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/email/templates', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    const templates = await EmailTemplate.find().sort({ key: 1 }).maxTimeMS(5000);
+    res.json(templates);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/email/templates/:key', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    const key = req.params.key;
+    if (!DEFAULT_EMAIL_TEMPLATES[key]) return res.status(404).json({ error: 'Unknown email template' });
+    const { name, subject, text, html, enabled } = req.body;
+    const template = await EmailTemplate.findOneAndUpdate(
+      { key },
+      {
+        name: String(name || DEFAULT_EMAIL_TEMPLATES[key].name),
+        subject: String(subject || ''),
+        text: String(text || ''),
+        html: String(html || ''),
+        enabled: enabled !== false,
+        updatedAt: new Date()
+      },
+      { upsert: true, new: true, runValidators: true }
+    ).maxTimeMS(5000);
+    res.json({ success: true, template });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/email/test', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
+    const to = String(req.body?.to || access.sessionUser.email).trim();
+    if (!to) return res.status(400).json({ error: 'Recipient email is required' });
+    await sendTemplateEmail('welcome', to, { name: 'ShopMaster Admin', email: to });
+    if (!isEmailConfigured()) return res.status(503).json({ error: 'SMTP is not configured. Add SMTP_USER and SMTP_PASS to Vercel.' });
+    res.json({ success: true, message: 'Test email queued for delivery.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== SELLER ROUTES ==========
 
 app.post('/api/sellers/apply', async (req, res) => {
@@ -615,6 +770,8 @@ app.post('/api/sellers/apply', async (req, res) => {
       isApproved: false,
       isSuperAdmin: false
     });
+
+    sendTemplateEmail('seller_application', seller.email, seller);
 
     res.status(201).json({
       success: true,
@@ -703,6 +860,8 @@ app.put('/api/sellers/:email/approve', async (req, res) => {
       await seller.save();
     }
     
+    sendTemplateEmail('seller_approved', seller.email, seller);
+
     res.json({ success: true, seller, message: 'Seller approved successfully' });
   } catch (error) {
     console.error('Approve seller error:', error);
@@ -731,6 +890,8 @@ app.put('/api/sellers/:email/revoke', async (req, res) => {
     if (!seller) {
       return res.status(404).json({ error: 'Seller not found' });
     }
+
+    sendTemplateEmail('seller_revoked', seller.email, seller);
 
     res.json({ success: true, seller, message: 'Seller access revoked' });
   } catch (error) {
@@ -1008,6 +1169,14 @@ app.post('/api/orders', async (req, res) => {
     
     await stats.save();
 
+    sendTemplateEmail('order_confirmation', order.user, {
+      name: order.userName,
+      email: order.user,
+      orderId: order.trackingId,
+      total: order.total,
+      status: order.status
+    });
+
     res.status(201).json({ 
       order, 
       stats, 
@@ -1117,6 +1286,14 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
+
+    sendTemplateEmail('order_status', order.user, {
+      name: order.userName,
+      email: order.user,
+      orderId: order.trackingId,
+      total: order.total,
+      status: order.status
+    });
 
     res.json({ message: 'Order status updated successfully', order });
   } catch (error) {
