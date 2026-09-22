@@ -12,8 +12,6 @@ import {
   updateOrderStatus,
   approveSeller,
   revokeSeller,
-  getEmailTemplate,
-  updateEmailTemplate
 } from './api';
 import './AdminPanel.css';
 import Swal from 'sweetalert2';
@@ -39,9 +37,6 @@ const AdminPanel = ({ currentUser }) => {
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [sellers, setSellers] = useState([]);
-  const [emailTemplate, setEmailTemplate] = useState({ enabled: true, subject: '', html: '' });
-  const [emailTemplateLoading, setEmailTemplateLoading] = useState(false);
-  const [emailTemplateSaving, setEmailTemplateSaving] = useState(false);
 
   const [newProduct, setNewProduct] = useState({
     id: '',
@@ -69,16 +64,8 @@ const AdminPanel = ({ currentUser }) => {
         ]);
 
         if (currentUser?.isSuperAdmin) {
-          const [sellersData, templateData] = await Promise.all([
-            getAllSellers(),
-            getEmailTemplate()
-          ]);
+          const sellersData = await getAllSellers();
           setSellers(Array.isArray(sellersData) ? sellersData : []);
-          setEmailTemplate({
-            enabled: templateData?.enabled !== false,
-            subject: templateData?.subject || '',
-            html: templateData?.html || ''
-          });
         } else {
           setSellers([]);
         }
@@ -106,38 +93,6 @@ const AdminPanel = ({ currentUser }) => {
     const intervalId = setInterval(loadData, 30 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, [loadData]);
-
-  const handleSaveEmailTemplate = async () => {
-    if (!currentUser?.isSuperAdmin) return;
-
-    if (!emailTemplate.subject.trim() || !emailTemplate.html.trim()) {
-      Swal.fire('Validation Error', 'Subject and HTML template are required.', 'error');
-      return;
-    }
-
-    setEmailTemplateSaving(true);
-    try {
-      const result = await updateEmailTemplate(emailTemplate);
-      setEmailTemplate({
-        enabled: result?.template?.enabled !== false,
-        subject: result?.template?.subject || emailTemplate.subject,
-        html: result?.template?.html || emailTemplate.html
-      });
-      await Swal.fire({
-        icon: 'success',
-        title: 'Email Template Saved',
-        text: emailTemplate.enabled
-          ? 'The updated template will be sent after successful Google sign-ins.'
-          : 'Automatic sign-in emails are now disabled.',
-        timer: 2200,
-        showConfirmButton: false
-      });
-    } catch (error) {
-      Swal.fire('Error', error.message || 'Failed to save email template', 'error');
-    } finally {
-      setEmailTemplateSaving(false);
-    }
-  };
 
   const handleApproveSeller = async (email) => {
     if (!currentUser?.isSuperAdmin) return;
@@ -537,9 +492,6 @@ const AdminPanel = ({ currentUser }) => {
             <button className={`btn ${activeTab === 'sellers' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('sellers')}>
               <i className="bi bi-people"></i> Sellers & Approvals
             </button>
-            <button className={`btn ${activeTab === 'email' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('email')}>
-              <i className="bi bi-envelope-heart"></i> Sign-in Email
-            </button>
           </>
         )}
       </div>
@@ -871,95 +823,6 @@ const AdminPanel = ({ currentUser }) => {
               })}
             </div>
           )}
-        </div>
-      )}
-
-      {activeTab === 'email' && currentUser?.isSuperAdmin && (
-        <div className="row g-4">
-          <div className="col-12">
-            <div className="card shadow">
-              <div className="card-body">
-                <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                  <div>
-                    <h3 className="card-title mb-1"><i className="bi bi-envelope-heart"></i> Automated sign-in email</h3>
-                    <p className="text-muted mb-0">
-                      Send a thank-you email after each successful Google sign-in. The email is sent server-side through Resend.
-                    </p>
-                  </div>
-                  <div className={`badge ${emailTemplate.enabled ? 'bg-success' : 'bg-secondary'}`}>
-                    {emailTemplate.enabled ? 'Enabled' : 'Disabled'}
-                  </div>
-                </div>
-
-                <div className="alert alert-info">
-                  <strong>Available placeholders:</strong> <code>{{name}}</code>, <code>{{email}}</code>, <code>{{businessName}}</code>
-                </div>
-
-                <div className="form-check form-switch mb-4">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="signinEmailEnabled"
-                    checked={emailTemplate.enabled}
-                    onChange={(e) => setEmailTemplate((prev) => ({ ...prev, enabled: e.target.checked }))}
-                  />
-                  <label className="form-check-label fw-semibold" htmlFor="signinEmailEnabled">
-                    Send this email automatically after sign-in
-                  </label>
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Email subject</label>
-                  <input
-                    className="form-control"
-                    maxLength={200}
-                    value={emailTemplate.subject}
-                    onChange={(e) => setEmailTemplate((prev) => ({ ...prev, subject: e.target.value }))}
-                    placeholder="Thanks for signing in to ShopMaster, {{name}}!"
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">HTML email template</label>
-                  <textarea
-                    className="form-control"
-                    rows={14}
-                    value={emailTemplate.html}
-                    onChange={(e) => setEmailTemplate((prev) => ({ ...prev, html: e.target.value }))}
-                    placeholder="<h2>Welcome {{name}}</h2><p>Thanks for signing in!</p>"
-                    spellCheck="false"
-                  />
-                  <div className="form-text">
-                    The HTML is rendered as an email. Keep the placeholders exactly as shown.
-                  </div>
-                </div>
-
-                <div className="d-flex flex-wrap gap-2">
-                  <button className="btn btn-primary" onClick={handleSaveEmailTemplate} disabled={emailTemplateSaving || emailTemplateLoading}>
-                    {emailTemplateSaving ? (
-                      <><span className="spinner-border spinner-border-sm me-2"></span>Saving...</>
-                    ) : (
-                      <><i className="bi bi-save me-1"></i> Save Email Template</>
-                    )}
-                  </button>
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={() => setEmailTemplate((prev) => ({
-                      ...prev,
-                      subject: 'Thanks for signing in to ShopMaster, {{name}}!',
-                      html: '<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Welcome to ShopMaster, {{name}} 👋</h2><p>Thanks for signing in to your ShopMaster account.</p><p>We appreciate you being part of our community.</p><p><strong>Account:</strong> {{email}}</p><p>Happy shopping!<br>— ShopMaster</p></div>'
-                    }))}
-                  >
-                    <i className="bi bi-arrow-counterclockwise me-1"></i> Restore Default
-                  </button>
-                </div>
-
-                <div className="alert alert-warning mt-4 mb-0">
-                  <strong>Deployment settings:</strong> add <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code> to the backend Vercel environment variables. Never put the Resend API key in frontend code.
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
