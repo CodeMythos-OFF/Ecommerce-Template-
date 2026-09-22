@@ -329,7 +329,9 @@ const statsSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-const Stats = mongoose.model('Stats', statsSchema);\n\n// Initialize all data
+const Stats = mongoose.model('Stats', statsSchema);
+
+// Initialize all data
 const initializeData = async () => {
   try {
     const stats = await Stats.findOne();
