@@ -12,6 +12,10 @@ import {
   updateOrderStatus,
   approveSeller,
   revokeSeller,
+  getMicrosoftEmailStatus,
+  getMicrosoftEmailTemplates,
+  updateMicrosoftEmailTemplate,
+  sendMicrosoftTestEmail,
 } from './api';
 import './AdminPanel.css';
 import Swal from 'sweetalert2';
@@ -37,6 +41,9 @@ const AdminPanel = ({ currentUser }) => {
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [sellers, setSellers] = useState([]);
+  const [emailTemplates, setEmailTemplates] = useState([]);
+  const [emailStatus, setEmailStatus] = useState({ configured: false, connected: false });
+  const [emailSaving, setEmailSaving] = useState(false);
   const [newProduct, setNewProduct] = useState({
     id: '',
     year: new Date().getFullYear(),
@@ -75,6 +82,16 @@ const AdminPanel = ({ currentUser }) => {
         setStats({});
         setOrders([]);
         setProducts([]);
+      }
+
+      if (currentUser?.isSuperAdmin) {
+        try {
+          const [status, templates] = await Promise.all([getMicrosoftEmailStatus(), getMicrosoftEmailTemplates()]);
+          setEmailStatus(status || {});
+          setEmailTemplates(Array.isArray(templates) ? templates : []);
+        } catch (emailError) {
+          console.warn('Microsoft email settings unavailable:', emailError);
+        }
       }
 
       setLastUpdated(new Date());
@@ -491,8 +508,36 @@ const AdminPanel = ({ currentUser }) => {
               <i className="bi bi-people"></i> Sellers & Approvals
             </button>
           </>
-        )}
+
+          <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('emails')}><i className="bi bi-envelope"></i> Automated Emails</button>        )}
       </div>
+
+      {activeTab === 'emails' && currentUser?.isSuperAdmin && (
+        <div className="card shadow-sm border-0 p-4 mb-4">
+          <h3>Microsoft Automated Emails</h3>
+          <p className="text-muted">Connect your personal Outlook.com account using Microsoft OAuth. Your Outlook password is never stored by ShopMaster.</p>
+          <div className={`alert ${emailStatus.connected ? 'alert-success' : 'alert-warning'}`}>
+            <strong>Status:</strong> {emailStatus.connected ? `Connected to ${emailStatus.accountEmail || 'Microsoft account'}` : 'Not connected'}
+          </div>
+          <a className="btn btn-primary me-2" href={`${window.location.origin}/api/email/microsoft/authorize`}>Connect Microsoft Account</a>
+          <button className="btn btn-outline-secondary" onClick={async () => { try { setEmailStatus(await getMicrosoftEmailStatus()); } catch (e) { Swal.fire('Error', e.message, 'error'); } }}>Refresh</button>
+          {emailStatus.connected && <div className="mt-4">
+            <button className="btn btn-success mb-3" onClick={async () => {
+              const r = await Swal.fire({ title: 'Test email', input: 'email', inputValue: currentUser?.email || '', showCancelButton: true, confirmButtonText: 'Send' });
+              if (!r.isConfirmed) return;
+              try { await sendMicrosoftTestEmail(r.value); Swal.fire('Sent', 'Test email sent.', 'success'); } catch (e) { Swal.fire('Error', e.message, 'error'); }
+            }}>Send Test Email</button>
+            {emailTemplates.map(template => <div className="border rounded p-3 mb-3" key={template.key}>
+              <h5>{template.name}</h5>
+              <input className="form-control mb-2" value={template.subject || ''} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, subject:e.target.value} : t))} />
+              <textarea className="form-control mb-2" rows="3" value={template.text || ''} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, text:e.target.value} : t))} />
+              <textarea className="form-control mb-2" rows="5" value={template.html || ''} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, html:e.target.value} : t))} />
+              <label className="d-block mb-2"><input type="checkbox" className="form-check-input me-2" checked={template.enabled !== false} onChange={e => setEmailTemplates(v => v.map(t => t.key === template.key ? {...t, enabled:e.target.checked} : t))} />Enabled</label>
+              <button className="btn btn-sm btn-success" disabled={emailSaving} onClick={async () => { setEmailSaving(true); try { const r=await updateMicrosoftEmailTemplate(template.key, template); setEmailTemplates(v=>v.map(t=>t.key===template.key?r.template:t)); Swal.fire('Saved','Template updated.','success'); } catch(e) { Swal.fire('Error',e.message,'error'); } finally { setEmailSaving(false); } }}>Save Template</button>
+            </div>)}
+          </div>
+        </div>
+      )}
 
       {activeTab === 'dashboard' && (
         <>
