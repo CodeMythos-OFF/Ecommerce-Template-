@@ -431,3 +431,28 @@ export const submitReview = async ({ productId, rating, comment = '', userEmail,
     return { fallback: true, reviews: fallback[productId] };
   }
 };
+
+export const getMicrosoftEmailStatus = async () => {
+  const response = await fetchWithRetry(`${API_URL}/email/status`, { headers: getAuthHeaders() });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to get email status');
+  return data;
+};
+export const getMicrosoftEmailTemplates = async () => {
+  const response = await fetchWithRetry(`${API_URL}/email/templates`, { headers: getAuthHeaders() });
+  const data = await response.json().catch(() => []);
+  if (!response.ok) throw new Error(data.error || 'Failed to get email templates');
+  return data;
+};
+export const updateMicrosoftEmailTemplate = async (key, template) => {
+  const response = await fetchWithRetry(`${API_URL}/email/templates/${encodeURIComponent(key)}`, { method: 'PUT', headers: getAuthHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(template) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to update email template');
+  return data;
+};
+export const sendMicrosoftTestEmail = async (to) => {
+  const response = await fetchWithRetry(`${API_URL}/email/test`, { method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ to }) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to send test email');
+  return data;
+};
