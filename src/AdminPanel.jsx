@@ -12,10 +12,6 @@ import {
   updateOrderStatus,
   approveSeller,
   revokeSeller,
-  getEmailStatus,
-  getEmailTemplates,
-  updateEmailTemplate,
-  sendTestEmail,
 } from './api';
 import './AdminPanel.css';
 import Swal from 'sweetalert2';
@@ -41,10 +37,6 @@ const AdminPanel = ({ currentUser }) => {
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [sellers, setSellers] = useState([]);
-  const [emailTemplates, setEmailTemplates] = useState([]);
-  const [emailStatus, setEmailStatus] = useState({ configured: false, verified: false });
-  const [emailSaving, setEmailSaving] = useState(false);
-
   const [newProduct, setNewProduct] = useState({
     id: '',
     year: new Date().getFullYear(),
@@ -75,17 +67,7 @@ const AdminPanel = ({ currentUser }) => {
           setSellers(Array.isArray(sellersData) ? sellersData : []);
         } else {
           setSellers([]);
-        }
-        if (currentUser?.isSuperAdmin) {
-          try {
-            const [emailData, templateData] = await Promise.all([getEmailStatus(), getEmailTemplates()]);
-            setEmailStatus(emailData || {});
-            setEmailTemplates(Array.isArray(templateData) ? templateData : []);
-          } catch (emailError) {
-            console.warn('Email settings unavailable:', emailError);
-          }
-        }
-        setStats(statsData || {});
+        }setStats(statsData || {});
         setOrders(Array.isArray(ordersData) ? ordersData : []);
         setProducts(Array.isArray(productsData) ? productsData : []);
       } catch (apiError) {
@@ -510,11 +492,6 @@ const AdminPanel = ({ currentUser }) => {
             </button>
           </>
         )}
-        {currentUser?.isSuperAdmin && (
-          <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('emails')}>
-            <i className="bi bi-envelope"></i> Automated Emails
-          </button>
-        )}
       </div>
 
       {activeTab === 'dashboard' && (
@@ -847,96 +824,6 @@ const AdminPanel = ({ currentUser }) => {
         </div>
       )}
 
-      {activeTab === 'emails' && currentUser?.isSuperAdmin && (
-        <div className="row g-4">
-          <div className="col-12">
-            <div className="card shadow">
-              <div className="card-body">
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                  <div>
-                    <h3 className="card-title mb-1"><i className="bi bi-envelope-paper"></i> Automated Emails</h3>
-                    <p className="text-muted mb-0">Manage Nodemailer SMTP settings status and customer email templates.</p>
-                  </div>
-                  <span className={`badge ${emailStatus.verified ? 'bg-success' : emailStatus.configured ? 'bg-warning text-dark' : 'bg-danger'}`}>
-                    {emailStatus.verified ? 'SMTP verified' : emailStatus.configured ? 'SMTP configured but not verified' : 'SMTP not configured'}
-                  </span>
-                </div>
-                <div className="alert alert-info">
-                  <strong>Automatic emails:</strong> welcome, order confirmation, order status changes, seller applications, seller approval and seller access revocation.
-                  <br />
-                  <small>Available variables include <code>{'{{name}}'}</code>, <code>{'{{email}}'}</code>, <code>{'{{orderId}}'}</code>, <code>{'{{total}}'}</code>, <code>{'{{status}}'}</code>, and <code>{'{{businessName}}'}</code>.</small>
-                </div>
-                <div className="d-flex flex-wrap gap-2 mb-4">
-                  <button className="btn btn-outline-primary" onClick={async () => {
-                    try {
-                      const status = await getEmailStatus();
-                      setEmailStatus(status);
-                      Swal.fire('Email status', status.verified ? 'SMTP connection verified.' : (status.error || 'SMTP is not verified.'), status.verified ? 'success' : 'warning');
-                    } catch (error) {
-                      Swal.fire('Error', error.message, 'error');
-                    }
-                  }}>
-                    <i className="bi bi-arrow-clockwise"></i> Check SMTP
-                  </button>
-                  <button className="btn btn-primary" onClick={async () => {
-                    const result = await Swal.fire({
-                      title: 'Send test email',
-                      input: 'email',
-                      inputValue: currentUser?.email || '',
-                      inputLabel: 'Recipient',
-                      showCancelButton: true,
-                      confirmButtonText: 'Send'
-                    });
-                    if (!result.isConfirmed) return;
-                    try {
-                      await sendTestEmail(result.value);
-                      Swal.fire('Sent', 'Test email request completed.', 'success');
-                    } catch (error) {
-                      Swal.fire('Error', error.message, 'error');
-                    }
-                  }}>
-                    <i className="bi bi-send"></i> Send Test Email
-                  </button>
-                </div>
-                {emailTemplates.length === 0 ? (
-                  <div className="alert alert-secondary">No templates loaded yet. Check SMTP/backend status and refresh.</div>
-                ) : emailTemplates.map((template) => (
-                  <div className="border rounded p-3 mb-4" key={template.key}>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h5 className="mb-0">{template.name}</h5>
-                      <span className="badge bg-light text-dark">{template.key}</span>
-                    </div>
-                    <label className="form-label">Subject</label>
-                    <input className="form-control mb-2" value={template.subject || ''} onChange={(e) => setEmailTemplates(prev => prev.map(t => t.key === template.key ? { ...t, subject: e.target.value } : t))} />
-                    <label className="form-label">Plain-text body</label>
-                    <textarea className="form-control mb-2" rows="4" value={template.text || ''} onChange={(e) => setEmailTemplates(prev => prev.map(t => t.key === template.key ? { ...t, text: e.target.value } : t))} />
-                    <label className="form-label">HTML body</label>
-                    <textarea className="form-control mb-2" rows="7" value={template.html || ''} onChange={(e) => setEmailTemplates(prev => prev.map(t => t.key === template.key ? { ...t, html: e.target.value } : t))} />
-                    <div className="form-check mb-3">
-                      <input className="form-check-input" type="checkbox" checked={template.enabled !== false} onChange={(e) => setEmailTemplates(prev => prev.map(t => t.key === template.key ? { ...t, enabled: e.target.checked } : t))} id={`email-enabled-${template.key}`} />
-                      <label className="form-check-label" htmlFor={`email-enabled-${template.key}`}>Enabled</label>
-                    </div>
-                    <button className="btn btn-success" disabled={emailSaving} onClick={async () => {
-                      setEmailSaving(true);
-                      try {
-                        const result = await updateEmailTemplate(template.key, template);
-                        setEmailTemplates(prev => prev.map(t => t.key === template.key ? result.template : t));
-                        Swal.fire({ icon: 'success', title: 'Template saved', timer: 1400, showConfirmButton: false });
-                      } catch (error) {
-                        Swal.fire('Error', error.message, 'error');
-                      } finally {
-                        setEmailSaving(false);
-                      }
-                    }}>
-                      <i className="bi bi-save"></i> Save Template
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {activeTab === 'sellers' && currentUser?.isSuperAdmin && (
         <div className="row g-4">
