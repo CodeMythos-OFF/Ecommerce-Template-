@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { getProductReviews, submitReview, getOrders } from "./api";
+import { getProductReviews, submitReview, getOrders, getMyProductReviewOrderIds } from "./api";
 
 const ProductReviews = ({ product, currentUser }) => {
   const [reviews, setReviews] = useState([]);
@@ -35,13 +35,12 @@ const ProductReviews = ({ product, currentUser }) => {
       setEligibleOrders([]);
       return;
     }
-    getOrders(100, null, currentUser.email)
-      .then((orders) => {
-        const alreadyReviewed = new Set(
-          (reviews || [])
-            .filter((review) => String(review.userEmail || '').toLowerCase() === String(currentUser.email).toLowerCase())
-            .map((review) => String(review.orderId))
-        );
+    Promise.all([
+      getOrders(100, null, currentUser.email),
+      getMyProductReviewOrderIds(product.id)
+    ])
+      .then(([orders, reviewedOrderIds]) => {
+        const alreadyReviewed = new Set((reviewedOrderIds || []).map(String));
         setEligibleOrders((orders || []).filter((order) =>
           String(order.status || '').toLowerCase() === 'delivered' &&
           (order.cart || []).some((item) => String(item.id) === String(product.id)) &&
