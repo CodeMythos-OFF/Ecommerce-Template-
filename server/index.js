@@ -1172,7 +1172,12 @@ app.get('/api/reviews/product/:productId', async (req, res) => {
     const productId = String(req.params.productId || '').trim();
     if (!productId) return res.status(400).json({ error: 'Product ID is required' });
 
-    const reviews = await Review.find({ productId }).sort({ createdAt: -1 }).limit(100).lean().maxTimeMS(5000);
+    const reviews = await Review.find({ productId })
+      .select('-userEmail')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean()
+      .maxTimeMS(5000);
     const summary = await Review.aggregate([
       { $match: { productId } },
       { $group: { _id: null, averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } }
@@ -1185,6 +1190,25 @@ app.get('/api/reviews/product/:productId', async (req, res) => {
     });
   } catch (error) {
     console.error('Get product reviews error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/reviews/mine/:productId', async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) return res.status(401).json({ error: 'Authentication is required' });
+    const productId = String(req.params.productId || '').trim();
+    if (!productId) return res.status(400).json({ error: 'Product ID is required' });
+
+    const reviews = await Review.find({
+      productId,
+      userEmail: sessionUser.email.toLowerCase()
+    }).select('orderId').lean().maxTimeMS(5000);
+
+    res.json({ orderIds: reviews.map((review) => String(review.orderId)) });
+  } catch (error) {
+    console.error('Get my product review history error:', error);
     res.status(500).json({ error: error.message });
   }
 });
