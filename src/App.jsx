@@ -1114,6 +1114,8 @@ function App() {
                         onShowDetails={showProductDetails}
                         onAddCart={handleAddToCart}
                         onRemoveCart={handleRemoveFromCart}
+                        isWishlisted={isWishlisted(product.id)}
+                        onToggleWishlist={handleToggleWishlist}
                       />
                     );
                   })}
