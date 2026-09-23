@@ -1125,6 +1125,7 @@ app.get('/api/stats', async (req, res) => {
         activeProducts: products.filter(p => p.isActive).length
       });
     } else {
+      if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
       let stats = await Stats.findOne().maxTimeMS(5000);
       if (!stats) {
         stats = await Stats.create({});
