@@ -11,6 +11,7 @@ const ProductReviews = ({ product, currentUser }) => {
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [eligibleOrders, setEligibleOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
 
   const loadReviews = useCallback(async () => {
     if (!product?.id) return;
@@ -35,13 +36,20 @@ const ProductReviews = ({ product, currentUser }) => {
       return;
     }
     getOrders(100, null, currentUser.email)
-      .then((orders) => setEligibleOrders((orders || []).filter((order) =>
-        String(order.status || '').toLowerCase() === 'delivered' &&
-        (order.cart || []).some((item) => String(item.id) === String(product.id)) &&
-        !((order.reviews || []).some((review) => String(review.productId) === String(product.id)))
-      )))
+      .then((orders) => {
+        const alreadyReviewed = new Set(
+          (reviews || [])
+            .filter((review) => String(review.userEmail || '').toLowerCase() === String(currentUser.email).toLowerCase())
+            .map((review) => String(review.orderId))
+        );
+        setEligibleOrders((orders || []).filter((order) =>
+          String(order.status || '').toLowerCase() === 'delivered' &&
+          (order.cart || []).some((item) => String(item.id) === String(product.id)) &&
+          !alreadyReviewed.has(String(order._id))
+        ));
+      })
       .catch(() => setEligibleOrders([]));
-  }, [currentUser?.email, product?.id]);
+  }, [currentUser?.email, product?.id, reviews]);
 
   const distribution = useMemo(() => {
     return [5, 4, 3, 2, 1].map((star) => {
@@ -64,12 +72,15 @@ const ProductReviews = ({ product, currentUser }) => {
     try {
       const data = await submitReview({
         productId: product.id,
-        orderId: document.getElementById("review-order-id")?.value
-      , rating, comment });
+        orderId: selectedOrderId,
+        rating,
+        comment
+      });
       setAverageRating(Number(data.averageRating || 0));
       setReviewCount(Number(data.reviewCount || 0));
       setRating(0);
       setComment("");
+      setSelectedOrderId("");
       await loadReviews();
       Swal.fire({ icon: "success", title: "Review published", text: "Thanks for sharing your experience!", timer: 1600, showConfirmButton: false });
     } catch (error) {
@@ -156,7 +167,7 @@ const ProductReviews = ({ product, currentUser }) => {
                   </div>
                   <label className="form-label fw-semibold">Delivered order</label>
                   {eligibleOrders.length > 0 ? (
-                    <select id="review-order-id" className="form-select mb-3" required>
+                    <select id="review-order-id" className="form-select mb-3" value={selectedOrderId} onChange={(event) => setSelectedOrderId(event.target.value)} required>
                       <option value="">Select an order</option>
                       {eligibleOrders.map((order) => <option key={order._id} value={order._id}>{order.trackingId || order._id} — {new Date(order.createdAt).toLocaleDateString("en-IN")}</option>)}
                     </select>
