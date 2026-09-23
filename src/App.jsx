@@ -8,6 +8,8 @@ import ProductReviews from "./ProductReviews";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsOfService from "./TermsOfService";
 import SellerApplication from "./SellerApplication";
+import Wishlist from "./Wishlist";
+import { getWishlist, toggleWishlist } from "./wishlistService";
 import "./SellerApplication.css";
 import "./App.css";
 import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./cartService";
@@ -30,6 +32,7 @@ const ROUTES = {
   "#privacy": "privacy",
   "#terms": "terms",
   "#sellerapply": "sellerapply",
+  "#wishlist": "wishlist",
 };
 
 const resolveRoute = (hash) => ROUTES[hash] || "home";
@@ -139,7 +142,7 @@ const BootScreen = () => (
   </div>
 );
 
-const ProductCard = React.memo(({ product, quantity, onShowDetails, onAddCart, onRemoveCart, variant = "grid" }) => {
+const ProductCard = React.memo(({ product, quantity, onShowDetails, onAddCart, onRemoveCart, isWishlisted = false, onToggleWishlist, variant = "grid" }) => {
   const brandText = getBrandName(product);
   const shippingText = product.shippingEtaText || product.shippingText || product.shipping || "";
   const mrp = product.mrp;
@@ -153,13 +156,25 @@ const ProductCard = React.memo(({ product, quantity, onShowDetails, onAddCart, o
         style={{ cursor: "pointer" }}
         onClick={() => onShowDetails(product)}
       >
-        <img
-          src={product.img}
-          className="card-img-top"
-          alt={product.id}
-          style={{ height: "250px", objectFit: "cover" }}
-          loading="lazy"
-        />
+        <div className="position-relative">
+          <img
+            src={product.img}
+            className="card-img-top"
+            alt={product.id}
+            style={{ height: "250px", objectFit: "cover" }}
+            loading="lazy"
+          />
+          {onToggleWishlist && (
+            <button
+              type="button"
+              className="btn btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-3"
+              aria-label={isWishlisted ? `Remove ${product.id} from wishlist` : `Add ${product.id} to wishlist`}
+              onClick={(event) => { event.stopPropagation(); onToggleWishlist(product); }}
+            >
+              <i className={`bi ${isWishlisted ? "bi-heart-fill text-danger" : "bi-heart"}`}></i>
+            </button>
+          )}
+        </div>
         <div className="card-body d-flex flex-column">
           {brandText ? <div className="product-brand">{brandText}</div> : null}
           <h5 className="card-title">{product.id}</h5>
@@ -204,7 +219,7 @@ const ProductCard = React.memo(({ product, quantity, onShowDetails, onAddCart, o
 
 ProductCard.displayName = "ProductCard";
 
-const ProductSlider = React.memo(({ title, products, cartItems, onShowDetails, onAddCart, onRemoveCart, onViewAll }) => {
+const ProductSlider = React.memo(({ title, products, cartItems, onShowDetails, onAddCart, onRemoveCart, isWishlisted, onToggleWishlist, onViewAll }) => {
   const trackRef = useRef(null);
 
   const scrollByAmount = (dir) => {
@@ -237,6 +252,8 @@ const ProductSlider = React.memo(({ title, products, cartItems, onShowDetails, o
                 onShowDetails={onShowDetails}
                 onAddCart={onAddCart}
                 onRemoveCart={onRemoveCart}
+                isWishlisted={isWishlisted(product.id)}
+                onToggleWishlist={onToggleWishlist}
                 variant="slider"
               />
             );
@@ -258,6 +275,7 @@ function App() {
   const [activePage, setActivePage] = useState(resolveRoute(window.location.hash));
   const [currentUser, setCurrentUser] = useState(null);
   const [cartItems, setCartItems] = useState([]);
+  const [wishlistItems, setWishlistItems] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -310,6 +328,7 @@ function App() {
           setCurrentUser(data.user);
           setIsAdmin(data.user.isAdmin === true);
           setCartItems(getCart(data.user.email));
+          setWishlistItems(getWishlist(data.user.email));
           sessionStorage.setItem("authUser", JSON.stringify(data.user));
         } else {
           // Only clear the cached user when the server explicitly says there is no session.
@@ -317,6 +336,7 @@ function App() {
           setCurrentUser(null);
           setIsAdmin(false);
           setCartItems([]);
+        setWishlistItems([]);
         }
       } catch (error) {
         if (!cancelled) {
@@ -327,6 +347,7 @@ function App() {
             setCurrentUser(cachedUser);
             setIsAdmin(cachedUser.isAdmin === true);
             setCartItems(getCart(cachedUser.email));
+            setWishlistItems(getWishlist(cachedUser.email));
           }
         }
       } finally {
@@ -361,6 +382,7 @@ function App() {
       setIsAdmin(user ? user.isAdmin === true : false);
       if (user) {
         setCartItems(getCart(user.email));
+        setWishlistItems(getWishlist(user.email));
       } else {
         setCartItems([]);
       }
@@ -541,6 +563,40 @@ function App() {
       });
     },
     [currentUser, cartItems, handlePageChange]
+  );
+
+  const handleToggleWishlist = useCallback(
+    (product) => {
+      if (!currentUser) {
+        Swal.fire({
+          icon: "warning",
+          title: "Please Sign In",
+          text: "Sign in to save products to your wishlist.",
+          confirmButtonText: "Sign In",
+        }).then((result) => {
+          if (result.isConfirmed) handlePageChange("login");
+        });
+        return;
+      }
+      const updated = toggleWishlist(currentUser.email, product);
+      setWishlistItems(updated);
+      const added = updated.some((item) => String(item.id) === String(product.id));
+      Swal.fire({
+        icon: added ? "success" : "info",
+        title: added ? "Added to Wishlist" : "Removed from Wishlist",
+        text: product.id,
+        timer: 1200,
+        showConfirmButton: false,
+        toast: true,
+        position: "top-end",
+      });
+    },
+    [currentUser, handlePageChange]
+  );
+
+  const isWishlisted = useCallback(
+    (productId) => wishlistItems.some((item) => String(item.id) === String(productId)),
+    [wishlistItems]
   );
 
   const handleRemoveFromCart = useCallback(
@@ -1440,6 +1496,19 @@ function App() {
                     </div>
                   </div>
                 </div>
+                <div className="col-md-6" onClick={() => handlePageChange("wishlist")} style={{ cursor: "pointer" }}>
+                  <div className="card shadow-sm border-0 h-100 action-card hover-lift">
+                    <div className="card-body d-flex align-items-center p-4">
+                      <div className="icon-box bg-danger-soft text-danger me-3">
+                        <i className="bi bi-heart-fill" style={{ fontSize: "1.7rem" }}></i>
+                      </div>
+                      <div>
+                        <h6 className="fw-bold mb-1">Wishlist</h6>
+                        <p className="text-muted small mb-0">{wishlistItems.length} saved product{wishlistItems.length === 1 ? "" : "s"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 {currentUser && !currentUser.isSeller && !currentUser.isSuperAdmin && (
                   <div className="col-md-6" onClick={() => handlePageChange("sellerapply")} style={{ cursor: "pointer" }}>
                     <div className="card shadow-sm border-0 h-100 action-card hover-lift">
@@ -1476,6 +1545,10 @@ function App() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div id="wishlist" className={`page ${activePage === "wishlist" ? "active" : ""}`}>
+        <Wishlist currentUser={currentUser} products={products} onShowDetails={showProductDetails} onAddCart={handleAddToCart} />
       </div>
 
       <div id="sellerapply" className={`page ${activePage === "sellerapply" ? "active" : ""}`}>
