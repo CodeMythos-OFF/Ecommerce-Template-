@@ -15,6 +15,7 @@ const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
   const googleButtonRenderedRef = useRef(false);
 
   const clearUser = useCallback(() => {
+    localStorage.removeItem('shopmaster_session_token');
     sessionStorage.removeItem('authUser');
     googleButtonRenderedRef.current = false;
     setUserInfo(null);
