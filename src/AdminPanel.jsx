@@ -16,6 +16,10 @@ import {
   getMicrosoftEmailTemplates,
   updateMicrosoftEmailTemplate,
   sendMicrosoftTestEmail,
+  getCoupons,
+  addCoupon,
+  updateCoupon,
+  deleteCoupon,
 } from './api';
 import './AdminPanel.css';
 import Swal from 'sweetalert2';
@@ -44,6 +48,10 @@ const AdminPanel = ({ currentUser }) => {
   const [emailTemplates, setEmailTemplates] = useState([]);
   const [emailStatus, setEmailStatus] = useState({ configured: false, connected: false });
   const [emailSaving, setEmailSaving] = useState(false);
+  const [coupons, setCoupons] = useState([]);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState(null);
+  const [couponForm, setCouponForm] = useState({ code: '', type: 'percent', value: '', minSubtotal: 0, active: true, expiresAt: '' });
   const [newProduct, setNewProduct] = useState({
     id: '',
     year: new Date().getFullYear(),
@@ -86,6 +94,13 @@ const AdminPanel = ({ currentUser }) => {
 
       if (currentUser?.isSuperAdmin) {
         try {
+          const couponData = await getCoupons();
+          setCoupons(Array.isArray(couponData) ? couponData : []);
+        } catch (couponError) {
+          console.warn('Coupon settings unavailable:', couponError);
+          setCoupons([]);
+        }
+        try {
           const [status, templates] = await Promise.all([getMicrosoftEmailStatus(), getMicrosoftEmailTemplates()]);
           setEmailStatus(status || {});
           setEmailTemplates(Array.isArray(templates) ? templates : []);
@@ -108,6 +123,91 @@ const AdminPanel = ({ currentUser }) => {
     const intervalId = setInterval(loadData, 30 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, [loadData]);
+
+  const resetCouponForm = () => {
+    setEditingCoupon(null);
+    setCouponForm({ code: '', type: 'percent', value: '', minSubtotal: 0, active: true, expiresAt: '' });
+  };
+
+  const handleSaveCoupon = async (event) => {
+    event.preventDefault();
+    if (!currentUser?.isSuperAdmin) return;
+
+    const code = couponForm.code.trim().toUpperCase();
+    const minSubtotal = Number(couponForm.minSubtotal) || 0;
+    const value = couponForm.type === 'free_delivery' ? 0 : Number(couponForm.value);
+
+    if (!code) {
+      Swal.fire('Validation error', 'Enter a coupon code.', 'error');
+      return;
+    }
+    if (couponForm.type === 'percent' && (value <= 0 || value > 100)) {
+      Swal.fire('Validation error', 'Percentage must be between 1 and 100.', 'error');
+      return;
+    }
+    if (couponForm.type === 'fixed' && value <= 0) {
+      Swal.fire('Validation error', 'Enter a fixed discount greater than ₹0.', 'error');
+      return;
+    }
+
+    setCouponLoading(true);
+    try {
+      const payload = {
+        code,
+        type: couponForm.type,
+        value,
+        minSubtotal,
+        active: couponForm.active,
+        expiresAt: couponForm.expiresAt || null
+      };
+      const saved = editingCoupon
+        ? await updateCoupon(editingCoupon._id, payload)
+        : await addCoupon(payload);
+
+      setCoupons((items) => editingCoupon
+        ? items.map((item) => item._id === saved._id ? saved : item)
+        : [saved, ...items]);
+      resetCouponForm();
+      Swal.fire({ icon: 'success', title: editingCoupon ? 'Coupon updated' : 'Coupon added', timer: 1400, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire('Error', error.message || 'Failed to save coupon', 'error');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleEditCoupon = (coupon) => {
+    setEditingCoupon(coupon);
+    setCouponForm({
+      code: coupon.code || '',
+      type: coupon.type || 'percent',
+      value: coupon.type === 'free_delivery' ? '' : coupon.value ?? '',
+      minSubtotal: coupon.minSubtotal ?? 0,
+      active: coupon.active !== false,
+      expiresAt: coupon.expiresAt ? new Date(coupon.expiresAt).toISOString().slice(0, 10) : ''
+    });
+    setActiveTab('coupons');
+  };
+
+  const handleDeleteCoupon = async (coupon) => {
+    const result = await Swal.fire({
+      title: 'Delete coupon?',
+      text: `Customers will no longer be able to use ${coupon.code}.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Delete'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      await deleteCoupon(coupon._id);
+      setCoupons((items) => items.filter((item) => item._id !== coupon._id));
+      if (editingCoupon?._id === coupon._id) resetCouponForm();
+      Swal.fire({ icon: 'success', title: 'Coupon deleted', timer: 1200, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire('Error', error.message || 'Failed to delete coupon', 'error');
+    }
+  };
 
   const handleApproveSeller = async (email) => {
     if (!currentUser?.isSuperAdmin) return;
@@ -509,6 +609,9 @@ const AdminPanel = ({ currentUser }) => {
             </button>
             <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('emails')}>
               <i className="bi bi-envelope"></i> Automated Emails
+            </button>
+            <button className={`btn ${activeTab === 'coupons' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('coupons')}>
+              <i className="bi bi-ticket-perforated"></i> Coupons
             </button>
           </>
         )}
