@@ -385,6 +385,7 @@ function App() {
         setWishlistItems(getWishlist(user.email));
       } else {
         setCartItems([]);
+        setWishlistItems([]);
       }
     };
     window.addEventListener("userChanged", handleUserChange);
