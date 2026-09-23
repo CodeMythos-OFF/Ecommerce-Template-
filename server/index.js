@@ -284,6 +284,8 @@ const orderSchema = new mongoose.Schema({
   userName: { type: String, required: true },
   items: { type: Number, required: true },
   subtotal: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
+  couponCode: { type: String, default: '' },
   shippingAmount: { type: Number, default: 0 },
   total: { type: Number, required: true },
   products: [{
@@ -1108,7 +1110,54 @@ app.post('/api/stats/view', async (req, res) => {
   }
 });
 
-// ========== ORDER ROUTES ==========
+// ========== ORDER ROUTES ==========\n\n// Coupon configuration
+const COUPONS = {
+  WELCOME10: { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 0, label: '10% off' },
+  SAVE100: { code: 'SAVE100', type: 'fixed', value: 100, minSubtotal: 1000, label: '₹100 off on orders of ₹1,000+' },
+  SHOP15: { code: 'SHOP15', type: 'percent', value: 15, minSubtotal: 2000, label: '15% off on orders of ₹2,000+' }
+};
+
+const calculateCoupon = (code, subtotal) => {
+  const normalized = String(code || '').trim().toUpperCase();
+  const coupon = COUPONS[normalized];
+  const safeSubtotal = Math.max(0, Number(subtotal) || 0);
+  if (!coupon) return { valid: false, error: 'Invalid or expired coupon code' };
+  if (safeSubtotal < coupon.minSubtotal) {
+    return { valid: false, error: `${coupon.code} requires a minimum subtotal of ₹${coupon.minSubtotal.toLocaleString('en-IN')}` };
+  }
+
+  const rawDiscount = coupon.type === 'percent'
+    ? safeSubtotal * (coupon.value / 100)
+    : coupon.value;
+  const discountAmount = Math.min(Math.round(rawDiscount), safeSubtotal);
+  const discountedSubtotal = safeSubtotal - discountAmount;
+  const shippingAmount = Math.round(discountedSubtotal * 0.05);
+  const total = discountedSubtotal + shippingAmount;
+
+  return {
+    valid: true,
+    coupon,
+    discountAmount,
+    discountedSubtotal,
+    shippingAmount,
+    total,
+    message: `${coupon.code} applied — ${coupon.label}`
+  };
+};
+
+app.post('/api/coupons/validate', async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) return res.status(401).json({ error: 'Please sign in before applying a coupon' });
+    const result = calculateCoupon(req.body?.code, req.body?.subtotal);
+    if (!result.valid) return res.status(400).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 
 // Generate unique tracking ID
 const generateTrackingId = () => {
@@ -1119,7 +1168,33 @@ const generateTrackingId = () => {
 // Create order with email notification
 app.post('/api/orders', async (req, res) => {
   try {
-    const { user, userName, items, subtotal, shippingAmount, total, products, cart, address } = req.body;
+    const { user, userName, items, subtotal, discountAmount, couponCode, shippingAmount, total, products, cart, address } = req.body;
+
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email || sessionUser.email.toLowerCase() !== String(user || '').toLowerCase()) {
+      return res.status(403).json({ error: 'You can only place orders for your own account' });
+    }
+
+    const baseSubtotal = Math.max(0, Number(subtotal) + (Number(discountAmount) || 0));
+    let calculatedDiscount = 0;
+    let calculatedSubtotal = baseSubtotal;
+    let calculatedShipping = Math.round(baseSubtotal * 0.05);
+    let calculatedTotal = calculatedSubtotal + calculatedShipping;
+    let normalizedCouponCode = '';
+
+    if (couponCode) {
+      const couponResult = calculateCoupon(couponCode, baseSubtotal);
+      if (!couponResult.valid) return res.status(400).json({ error: couponResult.error });
+      calculatedDiscount = couponResult.discountAmount;
+      calculatedSubtotal = couponResult.discountedSubtotal;
+      calculatedShipping = couponResult.shippingAmount;
+      calculatedTotal = couponResult.total;
+      normalizedCouponCode = couponResult.coupon.code;
+    }
+
+    if (Math.round(Number(total) || 0) !== calculatedTotal) {
+      return res.status(400).json({ error: 'Order total is out of sync. Please return to checkout and try again.' });
+    }
 
     // Validate address
     if (!address || !address.name || !address.street || !address.city || !address.state || !address.pincode || !address.phone) {
@@ -1143,9 +1218,11 @@ app.post('/api/orders', async (req, res) => {
       user,
       userName,
       items,
-      subtotal: Number(subtotal) || 0,
-      shippingAmount: Number(shippingAmount) || 0,
-      total,
+      subtotal: calculatedSubtotal,
+      discountAmount: calculatedDiscount,
+      couponCode: normalizedCouponCode,
+      shippingAmount: calculatedShipping,
+      total: calculatedTotal,
       products,
       cart: cart || [],  // Store full cart items with images and details
       address
