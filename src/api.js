@@ -59,6 +59,45 @@ export const trackView = async () => {
   }
 };
 
+export const getCoupons = async () => {
+  const response = await fetchWithRetry(`${API_URL}/coupons`, { headers: getAuthHeaders() });
+  const data = await response.json().catch(() => []);
+  if (!response.ok) throw new Error(data.error || 'Failed to load coupons');
+  return data;
+};
+
+export const addCoupon = async (coupon) => {
+  const response = await fetchWithRetry(`${API_URL}/coupons`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(coupon)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to add coupon');
+  return data;
+};
+
+export const updateCoupon = async (id, coupon) => {
+  const response = await fetchWithRetry(`${API_URL}/coupons/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(coupon)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to update coupon');
+  return data;
+};
+
+export const deleteCoupon = async (id) => {
+  const response = await fetchWithRetry(`${API_URL}/coupons/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to delete coupon');
+  return data;
+};
+
 export const validateCoupon = async (code, subtotal) => {
   try {
     const response = await fetchWithRetry(`${API_URL}/coupons/validate`, {
