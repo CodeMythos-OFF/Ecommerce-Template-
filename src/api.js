@@ -59,6 +59,22 @@ export const trackView = async () => {
   }
 };
 
+export const validateCoupon = async (code, subtotal) => {
+  try {
+    const response = await fetchWithRetry(`${API_URL}/coupons/validate`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ code, subtotal })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Invalid coupon code');
+    return data;
+  } catch (error) {
+    console.error('Error validating coupon:', error.message);
+    throw error;
+  }
+};
+
 export const createOrder = async (orderData) => {
   try {
     if (!orderData || !orderData.user || !orderData.userName) {
@@ -67,7 +83,7 @@ export const createOrder = async (orderData) => {
 
     const response = await fetchWithRetry(`${API_URL}/orders`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(orderData)
     });
     if (!response.ok) {
