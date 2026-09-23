@@ -357,6 +357,24 @@ const emailTemplateSchema = new mongoose.Schema({
 });
 const EmailTemplate = mongoose.model('EmailTemplate', emailTemplateSchema);
 
+const couponSchema = new mongoose.Schema({
+  code: { type: String, required: true, unique: true, uppercase: true, trim: true },
+  type: { type: String, enum: ['percent', 'fixed', 'free_delivery'], required: true },
+  value: { type: Number, default: 0 },
+  minSubtotal: { type: Number, default: 0 },
+  active: { type: Boolean, default: true },
+  expiresAt: { type: Date, default: null },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+const Coupon = mongoose.model('Coupon', couponSchema);
+
+const DEFAULT_COUPONS = [
+  { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 0, active: true },
+  { code: 'SAVE100', type: 'fixed', value: 100, minSubtotal: 1000, active: true },
+  { code: 'SHOP15', type: 'percent', value: 15, minSubtotal: 2000, active: true }
+];
+
 const DEFAULT_EMAIL_TEMPLATES = {
   welcome: { name: 'Welcome email', subject: 'Welcome to ShopMaster', text: 'Hi {{name}},\n\nWelcome to ShopMaster. Your account {{email}} is ready.', html: '<h1>Welcome to ShopMaster</h1><p>Hi {{name}},</p><p>Your account {{email}} is ready.</p>' },
   order_confirmation: { name: 'Order confirmation', subject: 'Order {{orderId}} confirmed', text: 'Your order {{orderId}} has been placed. Total: ₹{{total}}.', html: '<h2>Order confirmed</h2><p>Order <strong>{{orderId}}</strong> has been placed.</p><p>Total: ₹{{total}}</p>' },
@@ -396,6 +414,14 @@ const initializeEmailTemplates = async () => {
 // Initialize all data
 const initializeData = async () => {
   try {
+    for (const coupon of DEFAULT_COUPONS) {
+      await Coupon.findOneAndUpdate(
+        { code: coupon.code },
+        { $setOnInsert: { ...coupon, createdAt: new Date(), updatedAt: new Date() } },
+        { upsert: true }
+      );
+    }
+
     const stats = await Stats.findOne();
     if (!stats) {
       await Stats.create({});
@@ -1112,28 +1138,27 @@ app.post('/api/stats/view', async (req, res) => {
 
 // ========== ORDER ROUTES ==========
 
-// Coupon configuration
-const COUPONS = {
-  WELCOME10: { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 0, label: '10% off' },
-  SAVE100: { code: 'SAVE100', type: 'fixed', value: 100, minSubtotal: 1000, label: '₹100 off on orders of ₹1,000+' },
-  SHOP15: { code: 'SHOP15', type: 'percent', value: 15, minSubtotal: 2000, label: '15% off on orders of ₹2,000+' }
-};
-
-const calculateCoupon = (code, subtotal) => {
+// Coupon management
+const calculateCoupon = async (code, subtotal) => {
   const normalized = String(code || '').trim().toUpperCase();
-  const coupon = COUPONS[normalized];
   const safeSubtotal = Math.max(0, Number(subtotal) || 0);
-  if (!coupon) return { valid: false, error: 'Invalid or expired coupon code' };
+  const coupon = await Coupon.findOne({ code: normalized, active: true }).lean().maxTimeMS(5000);
+  if (!coupon) return { valid: false, error: 'Invalid, inactive, or expired coupon code' };
+  if (coupon.expiresAt && new Date(coupon.expiresAt) <= new Date()) {
+    return { valid: false, error: 'This coupon has expired' };
+  }
   if (safeSubtotal < coupon.minSubtotal) {
     return { valid: false, error: `${coupon.code} requires a minimum subtotal of ₹${coupon.minSubtotal.toLocaleString('en-IN')}` };
   }
 
   const rawDiscount = coupon.type === 'percent'
     ? safeSubtotal * (coupon.value / 100)
-    : coupon.value;
+    : coupon.type === 'fixed'
+      ? coupon.value
+      : 0;
   const discountAmount = Math.min(Math.round(rawDiscount), safeSubtotal);
   const discountedSubtotal = safeSubtotal - discountAmount;
-  const shippingAmount = Math.round(discountedSubtotal * 0.05);
+  const shippingAmount = coupon.type === 'free_delivery' ? 0 : Math.round(discountedSubtotal * 0.05);
   const total = discountedSubtotal + shippingAmount;
 
   return {
@@ -1143,7 +1168,9 @@ const calculateCoupon = (code, subtotal) => {
     discountedSubtotal,
     shippingAmount,
     total,
-    message: `${coupon.code} applied — ${coupon.label}`
+    message: coupon.type === 'free_delivery'
+      ? `${coupon.code} applied — Free delivery`
+      : `${coupon.code} applied — ${coupon.type === 'percent' ? coupon.value + '% off' : '₹' + coupon.value + ' off'}`
   };
 };
 
@@ -1151,7 +1178,7 @@ app.post('/api/coupons/validate', async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) return res.status(401).json({ error: 'Please sign in before applying a coupon' });
-    const result = calculateCoupon(req.body?.code, req.body?.subtotal);
+    const result = await calculateCoupon(req.body?.code, req.body?.subtotal);
     if (!result.valid) return res.status(400).json({ error: result.error });
     res.json(result);
   } catch (error) {
@@ -1159,7 +1186,79 @@ app.post('/api/coupons/validate', async (req, res) => {
   }
 });
 
+app.get('/api/coupons', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Only the super admin can manage coupons' });
+    res.json(await Coupon.find().sort({ createdAt: -1 }).maxTimeMS(5000));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
+app.post('/api/coupons', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Only the super admin can manage coupons' });
+
+    const { code, type, value, minSubtotal, active, expiresAt } = req.body;
+    const normalized = String(code || '').trim().toUpperCase();
+    const numericValue = Number(value) || 0;
+    const minimum = Math.max(0, Number(minSubtotal) || 0);
+    if (!/^[A-Z0-9_-]{3,30}$/.test(normalized)) return res.status(400).json({ error: 'Coupon code must be 3–30 characters using letters, numbers, _ or -' });
+    if (!['percent', 'fixed', 'free_delivery'].includes(type)) return res.status(400).json({ error: 'Invalid coupon type' });
+    if ((type === 'percent' && (numericValue <= 0 || numericValue > 100)) || (type === 'fixed' && numericValue <= 0)) return res.status(400).json({ error: 'Enter a valid discount value' });
+    if (type === 'free_delivery' && numericValue !== 0) return res.status(400).json({ error: 'Free delivery coupons do not need a discount value' });
+
+    const coupon = await Coupon.create({
+      code: normalized, type, value: type === 'free_delivery' ? 0 : numericValue,
+      minSubtotal: minimum, active: active !== false,
+      expiresAt: expiresAt ? new Date(expiresAt) : null
+    });
+    res.status(201).json(coupon);
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ error: 'That coupon code already exists' });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/coupons/:id', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Only the super admin can manage coupons' });
+
+    const { code, type, value, minSubtotal, active, expiresAt } = req.body;
+    const normalized = String(code || '').trim().toUpperCase();
+    const numericValue = Number(value) || 0;
+    const minimum = Math.max(0, Number(minSubtotal) || 0);
+    if (!/^[A-Z0-9_-]{3,30}$/.test(normalized)) return res.status(400).json({ error: 'Invalid coupon code' });
+    if (!['percent', 'fixed', 'free_delivery'].includes(type)) return res.status(400).json({ error: 'Invalid coupon type' });
+    if ((type === 'percent' && (numericValue <= 0 || numericValue > 100)) || (type === 'fixed' && numericValue <= 0)) return res.status(400).json({ error: 'Enter a valid discount value' });
+
+    const coupon = await Coupon.findByIdAndUpdate(
+      req.params.id,
+      { code: normalized, type, value: type === 'free_delivery' ? 0 : numericValue, minSubtotal: minimum, active: active !== false, expiresAt: expiresAt ? new Date(expiresAt) : null, updatedAt: new Date() },
+      { new: true, runValidators: true }
+    );
+    if (!coupon) return res.status(404).json({ error: 'Coupon not found' });
+    res.json(coupon);
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ error: 'That coupon code already exists' });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/coupons/:id', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Only the super admin can manage coupons' });
+    const coupon = await Coupon.findByIdAndDelete(req.params.id);
+    if (!coupon) return res.status(404).json({ error: 'Coupon not found' });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Generate unique tracking ID
 const generateTrackingId = () => {
@@ -1185,7 +1284,7 @@ app.post('/api/orders', async (req, res) => {
     let normalizedCouponCode = '';
 
     if (couponCode) {
-      const couponResult = calculateCoupon(couponCode, baseSubtotal);
+      const couponResult = await calculateCoupon(couponCode, baseSubtotal);
       if (!couponResult.valid) return res.status(400).json({ error: couponResult.error });
       calculatedDiscount = couponResult.discountAmount;
       calculatedSubtotal = couponResult.discountedSubtotal;
