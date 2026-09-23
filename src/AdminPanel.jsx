@@ -618,6 +618,109 @@ const AdminPanel = ({ currentUser }) => {
       </div>
 
 
+      {activeTab === 'coupons' && currentUser?.isSuperAdmin && (
+        <div className="row g-4">
+          <div className="col-lg-5">
+            <div className="card shadow-sm border-0">
+              <div className="card-body p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <h3 className="mb-1"><i className="bi bi-ticket-perforated me-2"></i>{editingCoupon ? 'Edit Coupon' : 'Add Coupon'}</h3>
+                    <p className="text-muted small mb-0">Choose the discount customers receive at checkout.</p>
+                  </div>
+                  {editingCoupon && <button className="btn btn-sm btn-outline-secondary" onClick={resetCouponForm}>Cancel</button>}
+                </div>
+
+                <form onSubmit={handleSaveCoupon}>
+                  <label className="form-label fw-semibold">Coupon code</label>
+                  <input className="form-control mb-3" value={couponForm.code} onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} placeholder="SAVE200" maxLength={30} required />
+
+                  <label className="form-label fw-semibold">Offer type</label>
+                  <select className="form-select mb-3" value={couponForm.type} onChange={(e) => setCouponForm({ ...couponForm, type: e.target.value })}>
+                    <option value="percent">X% off</option>
+                    <option value="fixed">₹X off</option>
+                    <option value="free_delivery">Free delivery</option>
+                  </select>
+
+                  {couponForm.type !== 'free_delivery' && (
+                    <>
+                      <label className="form-label fw-semibold">{couponForm.type === 'percent' ? 'Percentage' : 'Discount amount (₹)'}</label>
+                      <input type="number" className="form-control mb-3" min="1" max={couponForm.type === 'percent' ? 100 : undefined} value={couponForm.value} onChange={(e) => setCouponForm({ ...couponForm, value: e.target.value })} required />
+                    </>
+                  )}
+
+                  <label className="form-label fw-semibold">Minimum order value (₹)</label>
+                  <input type="number" className="form-control mb-1" min="0" value={couponForm.minSubtotal} onChange={(e) => setCouponForm({ ...couponForm, minSubtotal: e.target.value })} />
+                  <div className="form-text mb-3">Set 0 if there is no minimum.</div>
+
+                  <label className="form-label fw-semibold">Expiry date</label>
+                  <input type="date" className="form-control mb-3" value={couponForm.expiresAt} onChange={(e) => setCouponForm({ ...couponForm, expiresAt: e.target.value })} />
+
+                  <div className="form-check form-switch mb-4">
+                    <input className="form-check-input" type="checkbox" checked={couponForm.active} onChange={(e) => setCouponForm({ ...couponForm, active: e.target.checked })} id="coupon-active-switch" />
+                    <label className="form-check-label" htmlFor="coupon-active-switch">Active coupon</label>
+                  </div>
+
+                  <button className="btn btn-primary w-100" type="submit" disabled={couponLoading}>
+                    {couponLoading ? 'Saving...' : editingCoupon ? 'Update Coupon' : 'Create Coupon'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-lg-7">
+            <div className="card shadow-sm border-0">
+              <div className="card-body p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <h3 className="mb-1">Your Coupons</h3>
+                    <p className="text-muted small mb-0">These are the coupons customers can use during checkout.</p>
+                  </div>
+                  <button className="btn btn-outline-primary btn-sm" onClick={async () => { try { const data = await getCoupons(); setCoupons(data); } catch (e) { Swal.fire('Error', e.message, 'error'); } }}>
+                    <i className="bi bi-arrow-clockwise"></i> Refresh
+                  </button>
+                </div>
+
+                {coupons.length === 0 ? (
+                  <div className="text-center py-5">
+                    <i className="bi bi-ticket-perforated display-4 text-muted"></i>
+                    <h5 className="mt-3">No coupons yet</h5>
+                    <p className="text-muted">Create a coupon using the form on the left.</p>
+                  </div>
+                ) : (
+                  <div className="d-grid gap-3">
+                    {coupons.map((coupon) => (
+                      <div key={coupon._id} className="border rounded-3 p-3">
+                        <div className="d-flex justify-content-between align-items-start gap-3">
+                          <div>
+                            <div className="d-flex align-items-center gap-2">
+                              <strong className="fs-5">{coupon.code}</strong>
+                              <span className={`badge ${coupon.active ? 'bg-success' : 'bg-secondary'}`}>{coupon.active ? 'Active' : 'Inactive'}</span>
+                            </div>
+                            <div className="fw-semibold text-primary mt-1">
+                              {coupon.type === 'percent' ? `${coupon.value}% off` : coupon.type === 'fixed' ? `₹${coupon.value} off` : 'Free delivery'}
+                            </div>
+                            <div className="small text-muted mt-1">
+                              {coupon.minSubtotal > 0 ? `Minimum order: ₹${coupon.minSubtotal}` : 'No minimum order'}
+                              {coupon.expiresAt ? ` • Expires: ${new Date(coupon.expiresAt).toLocaleDateString()}` : ' • No expiry'}
+                            </div>
+                          </div>
+                          <div className="d-flex gap-2">
+                            <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditCoupon(coupon)}>Edit</button>
+                            <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteCoupon(coupon)}>Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'emails' && currentUser?.isSuperAdmin && (
         <div className="card shadow-sm border-0 p-4 mb-4">
           <h3>Microsoft Automated Emails</h3>
