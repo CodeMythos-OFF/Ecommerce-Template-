@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { getProductReviews, submitReview } from "./api";
+import { getProductReviews, submitReview, getOrders } from "./api";
 
 const ProductReviews = ({ product, currentUser }) => {
   const [reviews, setReviews] = useState([]);
@@ -10,6 +10,7 @@ const ProductReviews = ({ product, currentUser }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [eligibleOrders, setEligibleOrders] = useState([]);
 
   const loadReviews = useCallback(async () => {
     if (!product?.id) return;
@@ -27,6 +28,20 @@ const ProductReviews = ({ product, currentUser }) => {
   }, [product?.id]);
 
   useEffect(() => { loadReviews(); }, [loadReviews]);
+
+  useEffect(() => {
+    if (!currentUser?.email || !product?.id) {
+      setEligibleOrders([]);
+      return;
+    }
+    getOrders(100, null, currentUser.email)
+      .then((orders) => setEligibleOrders((orders || []).filter((order) =>
+        String(order.status || '').toLowerCase() === 'delivered' &&
+        (order.cart || []).some((item) => String(item.id) === String(product.id)) &&
+        !((order.reviews || []).some((review) => String(review.productId) === String(product.id)))
+      )))
+      .catch(() => setEligibleOrders([]));
+  }, [currentUser?.email, product?.id]);
 
   const distribution = useMemo(() => {
     return [5, 4, 3, 2, 1].map((star) => {
@@ -49,7 +64,7 @@ const ProductReviews = ({ product, currentUser }) => {
     try {
       const data = await submitReview({
         productId: product.id,
-        orderId: document.getElementById("review-order-id")?.value.trim()
+        orderId: document.getElementById("review-order-id")?.value
       , rating, comment });
       setAverageRating(Number(data.averageRating || 0));
       setReviewCount(Number(data.reviewCount || 0));
@@ -139,11 +154,19 @@ const ProductReviews = ({ product, currentUser }) => {
                   <div className="d-flex gap-1 mb-3">
                     {[1,2,3,4,5].map((star) => <button type="button" key={star} className={"btn btn-sm " + (rating >= star ? "text-warning" : "text-muted")} onClick={() => setRating(star)}><i className="bi bi-star-fill fs-4"></i></button>)}
                   </div>
-                  <label className="form-label fw-semibold">Order ID</label>
-                  <input id="review-order-id" className="form-control mb-3" placeholder="Example: 65..." required />
+                  <label className="form-label fw-semibold">Delivered order</label>
+                  {eligibleOrders.length > 0 ? (
+                    <select id="review-order-id" className="form-select mb-3" required>
+                      <option value="">Select an order</option>
+                      {eligibleOrders.map((order) => <option key={order._id} value={order._id}>{order.trackingId || order._id} — {new Date(order.createdAt).toLocaleDateString("en-IN")}</option>)}
+                    </select>
+                  ) : (
+                    <div className="alert alert-light border small">No eligible delivered order found for this product. You can review it after your order is delivered.</div>
+                  )}
+
                   <label className="form-label fw-semibold">Comment</label>
                   <textarea className="form-control mb-3" rows="4" maxLength="1000" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Tell other customers about your experience..." />
-                  <button className="btn btn-primary w-100" disabled={submitting}>{submitting ? "Publishing..." : "Publish review"}</button>
+                  <button className="btn btn-primary w-100" disabled={submitting || eligibleOrders.length === 0}>{submitting ? "Publishing..." : "Publish review"}</button>
                 </form>
               }
             </div>
