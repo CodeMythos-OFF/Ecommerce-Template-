@@ -520,13 +520,4 @@ export const getProductReviews = async (productId) => {
   return data;
 };
 
-export const submitReview = async (reviewData) => {
-  const response = await fetchWithRetry(`${API_URL}/reviews`, {
-    method: 'POST',
-    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(reviewData)
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Failed to submit review');
-  return data;
-};
+
