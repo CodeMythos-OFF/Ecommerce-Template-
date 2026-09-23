@@ -10,7 +10,7 @@ import SellerApplication from "./SellerApplication";
 import "./SellerApplication.css";
 import "./App.css";
 import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./cartService";
-import { trackView, createOrder, getProducts } from "./api";
+import { trackView, createOrder, getProducts, validateCoupon } from "./api";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
 import Swal from "sweetalert2";
 
@@ -569,11 +569,41 @@ function App() {
   const handleCheckout = useCallback(async () => {
     if (!currentUser || cartItems.length === 0) return;
     const savedAddresses = getAddresses(currentUser.email);
+    let appliedCoupon = null;
+    let finalDiscount = 0;
+    let finalSubtotal = subtotal;
+    let finalShipping = shippingAmount;
+    let finalTotal = totalPrice;
+
+    const updateSummary = () => {
+      const summary = document.getElementById("checkout-summary");
+      if (!summary) return;
+      summary.innerHTML = `
+        <div class="d-flex justify-content-between small"><span>Subtotal:</span><span>₹${subtotal}</span></div>
+        <div class="d-flex justify-content-between small ${finalDiscount > 0 ? "text-success" : "d-none"}"><span>Coupon discount:</span><span>-₹${finalDiscount}</span></div>
+        <div class="d-flex justify-content-between small"><span>Shipping (5%):</span><span>₹${finalShipping}</span></div>
+        <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-2"><span>Total:</span><span>₹${finalTotal}</span></div>
+      `;
+    };
 
     const { value: formValues } = await Swal.fire({
-      title: "Delivery Address",
+      title: "Checkout",
       html: `
         <div style="text-align:left">
+          <div class="p-3 mb-3 rounded-3" style="background:#f8f9fa;border:1px solid #dee2e6">
+            <div class="fw-bold mb-2"><i class="bi bi-ticket-perforated text-primary"></i> Have a coupon?</div>
+            <div class="input-group">
+              <input id="swal-coupon" class="form-control" placeholder="Enter coupon code" autocomplete="off">
+              <button id="apply-coupon-btn" type="button" class="btn btn-outline-primary">Apply</button>
+            </div>
+            <div id="coupon-result" class="small mt-2"></div>
+          </div>
+          <div id="checkout-summary" class="p-3 mb-3 rounded-3" style="background:#f0fff4;border:1px solid #cce8d1">
+            <div class="d-flex justify-content-between small"><span>Subtotal:</span><span>₹${subtotal}</span></div>
+            <div class="d-flex justify-content-between small d-none"><span>Coupon discount:</span><span>-₹0</span></div>
+            <div class="d-flex justify-content-between small"><span>Shipping (5%):</span><span>₹${shippingAmount}</span></div>
+            <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-2"><span>Total:</span><span>₹${totalPrice}</span></div>
+          </div>
           ${savedAddresses.length > 0 ? `
             <div class="mb-3">
               <label class="form-label fw-bold">Select Saved Address</label>
@@ -606,6 +636,40 @@ function App() {
       focusConfirm: false,
       didOpen: () => {
         const showPin = (x) => { document.getElementById("digipin-result").classList.remove("d-none"); document.getElementById("digipin-value").textContent = x.digipin; document.getElementById("digipin-accuracy").textContent = x.accuracy ? `Device accuracy: ~${x.accuracy} m` : "Device accuracy unavailable"; document.getElementById("digipin-coordinates").textContent = `Coordinates: ${x.latitude.toFixed(6)}, ${x.longitude.toFixed(6)}`; };
+        document.getElementById("apply-coupon-btn").addEventListener("click", async () => {
+          const input = document.getElementById("swal-coupon");
+          const result = document.getElementById("coupon-result");
+          const button = document.getElementById("apply-coupon-btn");
+          const code = input.value.trim().toUpperCase();
+          if (!code) { result.className = "small mt-2 text-danger"; result.textContent = "Enter a coupon code."; return; }
+          button.disabled = true;
+          button.textContent = "Checking...";
+          result.className = "small mt-2 text-muted";
+          result.textContent = "Validating coupon...";
+          try {
+            const coupon = await validateCoupon(code, subtotal);
+            appliedCoupon = coupon.coupon;
+            finalDiscount = coupon.discountAmount;
+            finalSubtotal = coupon.discountedSubtotal;
+            finalShipping = coupon.shippingAmount;
+            finalTotal = coupon.total;
+            result.className = "small mt-2 text-success fw-semibold";
+            result.textContent = `✓ ${coupon.message}`;
+            updateSummary();
+          } catch (error) {
+            appliedCoupon = null;
+            finalDiscount = 0;
+            finalSubtotal = subtotal;
+            finalShipping = shippingAmount;
+            finalTotal = totalPrice;
+            result.className = "small mt-2 text-danger";
+            result.textContent = error.message || "Invalid coupon code";
+            updateSummary();
+          } finally {
+            button.disabled = false;
+            button.textContent = "Apply";
+          }
+        });
         document.getElementById("use-location-btn").addEventListener("click", async (event) => {
           event.preventDefault(); const button = event.currentTarget; button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Getting location...';
           try { const location = await getLocationAddress(); window.__shopmasterDigipinLocation = location; showPin(location); button.innerHTML = '<i class="bi bi-check-circle"></i> DIGIPIN captured'; }
@@ -624,22 +688,10 @@ function App() {
         const country = document.getElementById("swal-country").value.trim();
         const saveAddress = document.getElementById("swal-save-address").checked;
         const location = window.__shopmasterDigipinLocation;
-        if (!location?.digipin) {
-          Swal.showValidationMessage("Please tap Get My DIGIPIN first.");
-          return false;
-        }
-        if (!name || !phone || !street || !city || !state || !pincode) {
-          Swal.showValidationMessage("Please fill all required fields");
-          return false;
-        }
-        if (!/^\d{10}$/.test(phone)) {
-          Swal.showValidationMessage("Please enter a valid 10-digit phone number");
-          return false;
-        }
-        if (!/^\d{6}$/.test(pincode)) {
-          Swal.showValidationMessage("Please enter a valid 6-digit PIN code");
-          return false;
-        }
+        if (!location?.digipin) { Swal.showValidationMessage("Please tap Get My DIGIPIN first."); return false; }
+        if (!name || !phone || !street || !city || !state || !pincode) { Swal.showValidationMessage("Please fill all required fields"); return false; }
+        if (!/^\\d{10}$/.test(phone)) { Swal.showValidationMessage("Please enter a valid 10-digit phone number"); return false; }
+        if (!/^\\d{6}$/.test(pincode)) { Swal.showValidationMessage("Please enter a valid 6-digit PIN code"); return false; }
         return { name, phone, street, city, state, pincode, country, saveAddress, digipin: location.digipin, latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy };
       }
     });
@@ -652,9 +704,11 @@ function App() {
         user: currentUser.email,
         userName: currentUser.name,
         items: cartItems.length,
-        subtotal,
-        shippingAmount,
-        total: totalPrice,
+        subtotal: finalSubtotal,
+        discountAmount: finalDiscount,
+        couponCode: appliedCoupon?.code || "",
+        shippingAmount: finalShipping,
+        total: finalTotal,
         products: groupedCart.map((item) => ({
           name: item.id,
           quantity: item.quantity,
@@ -671,17 +725,10 @@ function App() {
           quantity: item.quantity
         })),
         address: {
-          name: formValues.name,
-          phone: formValues.phone,
-          street: formValues.street,
-          city: formValues.city,
-          state: formValues.state,
-          pincode: formValues.pincode,
-          country: formValues.country,
-          digipin: formValues.digipin,
-          latitude: formValues.latitude,
-          longitude: formValues.longitude,
-          accuracy: formValues.accuracy
+          name: formValues.name, phone: formValues.phone, street: formValues.street,
+          city: formValues.city, state: formValues.state, pincode: formValues.pincode,
+          country: formValues.country, digipin: formValues.digipin,
+          latitude: formValues.latitude, longitude: formValues.longitude, accuracy: formValues.accuracy
         }
       };
 
@@ -690,18 +737,15 @@ function App() {
       Swal.fire({
         icon: "success",
         title: "Order Placed!",
-        html: `<p>Your order of <strong>₹${totalPrice}</strong> has been placed successfully!</p>
+        html: `<p>Your order of <strong>₹${finalTotal}</strong> has been placed successfully!</p>
           <div class="text-start mt-3 p-3" style="background:#f8f9fa;border-radius:8px">
             <div class="d-flex justify-content-between small"><span>Subtotal:</span><span>₹${subtotal}</span></div>
-            <div class="d-flex justify-content-between small"><span>Shipping (5%):</span><span>₹${shippingAmount}</span></div>
-            <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-1"><span>Total:</span><span>₹${totalPrice}</span></div>
+            ${finalDiscount > 0 ? `<div class="d-flex justify-content-between small text-success"><span>Coupon (${appliedCoupon?.code}):</span><span>-₹${finalDiscount}</span></div>` : ""}
+            <div class="d-flex justify-content-between small"><span>Shipping (5%):</span><span>₹${finalShipping}</span></div>
+            <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-1"><span>Total:</span><span>₹${finalTotal}</span></div>
           </div>`,
         confirmButtonText: "OK"
-      }).then(() => {
-        setCartItems([]);
-        saveCart(currentUser.email, []);
-        handlePageChange("home");
-      });
+      }).then(() => { setCartItems([]); saveCart(currentUser.email, []); handlePageChange("home"); });
     } catch (error) {
       console.error("Error saving order:", error);
       Swal.fire({ icon: "error", title: "Order Failed", text: error.message || "Failed to place order. Please try again." });
