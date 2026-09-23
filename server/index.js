@@ -967,7 +967,12 @@ app.get('/api/products', async (req, res) => {
 
 app.get('/api/sellers/:email/products', async (req, res) => {
   try {
-    const products = await Product.find({ sellerEmail: req.params.email }).sort({ createdAt: -1 }).maxTimeMS(5000);
+    const access = await getAccessContext(req);
+    const requestedEmail = String(req.params.email || '').toLowerCase();
+    if (!access?.isSuperAdmin && (!access?.isSeller || access.sessionUser.email.toLowerCase() !== requestedEmail)) {
+      return res.status(403).json({ error: 'Seller access is required' });
+    }
+    const products = await Product.find({ sellerEmail: requestedEmail }).sort({ createdAt: -1 }).maxTimeMS(5000);
     res.json(products);
   } catch (error) {
     console.error('Get seller products error:', error);
@@ -1095,14 +1100,21 @@ app.delete('/api/products/:id', async (req, res) => {
 app.get('/api/stats', async (req, res) => {
   try {
     const { sellerEmail } = req.query;
-    
+    const access = await getAccessContext(req);
     if (sellerEmail) {
-      const products = await Product.find({ sellerEmail }).maxTimeMS(5000);
-      const orders = await Order.find({ 'products.sellerEmail': sellerEmail }).maxTimeMS(5000);
+      if (!access?.canManageProducts) return res.status(403).json({ error: 'Seller or super admin access is required' });
+      if (!access.isSuperAdmin && String(sellerEmail).toLowerCase() !== access.sessionUser.email.toLowerCase()) {
+        return res.status(403).json({ error: 'You can only view your own seller statistics' });
+      }
+      const scopedSellerEmail = access.isSuperAdmin
+        ? String(sellerEmail).toLowerCase()
+        : access.sessionUser.email.toLowerCase();
+      const products = await Product.find({ sellerEmail: scopedSellerEmail }).maxTimeMS(5000);
+      const orders = await Order.find({ 'products.sellerEmail': scopedSellerEmail }).maxTimeMS(5000);
       
       const totalOrders = orders.length;
       const totalRevenue = orders.reduce((sum, order) => {
-        const sellerItems = order.products.filter(p => p.sellerEmail === sellerEmail);
+        const sellerItems = order.products.filter(p => p.sellerEmail === scopedSellerEmail);
         return sum + sellerItems.reduce((s, item) => s + (item.price * item.quantity), 0);
       }, 0);
       
@@ -1194,10 +1206,7 @@ app.post('/api/reviews', async (req, res) => {
       _id: orderId,
       user: sessionUser.email.toLowerCase(),
       status: 'Delivered',
-      $or: [
-        { 'cart.id': productId },
-        { 'products.name': productId }
-      ]
+      'cart.id': productId
     }).lean().maxTimeMS(5000);
 
     if (!order) return res.status(403).json({ error: 'You can review this product only after it has been delivered to your account' });
@@ -1497,10 +1506,24 @@ app.get('/api/orders', async (req, res) => {
 
 app.get('/api/orders/:id', async (req, res) => {
   try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) return res.status(401).json({ error: 'Authentication is required' });
+
+    const access = await getAccessContext(req);
     const order = await Order.findById(req.params.id).maxTimeMS(5000);
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const isOwner = order.user.toLowerCase() === sessionUser.email.toLowerCase();
+    const isSuperAdmin = Boolean(access?.isSuperAdmin);
+    const isSellerForOrder = Boolean(
+      access?.isSeller &&
+      (order.products || []).some((item) => String(item.sellerEmail || '').toLowerCase() === sessionUser.email.toLowerCase())
+    );
+
+    if (!isOwner && !isSuperAdmin && !isSellerForOrder) {
+      return res.status(403).json({ error: 'You do not have permission to view this order' });
     }
+
     res.json(order);
   } catch (error) {
     console.error('Get order error:', error);
@@ -1552,14 +1575,19 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status value' });
     }
 
-    const order = await Order.findByIdAndUpdate(
-      orderId,
+    const statusFilter = { _id: orderId };
+    if (!access.isSuperAdmin) {
+      statusFilter['products.sellerEmail'] = access.sessionUser.email.toLowerCase();
+    }
+
+    const order = await Order.findOneAndUpdate(
+      statusFilter,
       { status },
       { new: true, runValidators: true }
     );
 
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: 'Order not found or you do not manage any products in this order' });
     }
 
     sendTemplateEmail('order_status', order.user, { name: order.userName, email: order.user, orderId: order.trackingId, total: order.total, status: order.status });
