@@ -412,4 +412,13 @@ export const getProductReviews = async (productId) => {
   return data;
 };
 
+export const getMyProductReviewOrderIds = async (productId) => {
+  const response = await fetchWithRetry(`${API_URL}/reviews/mine/${encodeURIComponent(productId)}`, {
+    headers: getAuthHeaders()
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to load your review history');
+  return Array.isArray(data.orderIds) ? data.orderIds : [];
+};
+
 
