@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import "./Navigation.css";
 import { getCurrentUser } from "./cartService";
+const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 import Swal from 'sweetalert2';
 
 // Icon mapping for bottom navigation
@@ -58,31 +59,43 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
     setShowUserMenu((prev) => !prev);
   };
 
-  const handleSignOut = (event) => {
+  const handleSignOut = async (event) => {
     event.preventDefault();
     setShowUserMenu(false);
-    Swal.fire({
+    const result = await Swal.fire({
       title: 'Sign Out?',
       text: 'Are you sure you want to sign out?',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, sign out',
       cancelButtonText: 'Cancel'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        sessionStorage.removeItem('authUser');
-        sessionStorage.removeItem('authToken');
-        window.dispatchEvent(new Event('userChanged'));
-        Swal.fire({
-          icon: 'success',
-          title: 'Signed Out',
-          text: 'You have been signed out successfully',
-          timer: 1500,
-          showConfirmButton: false
-        });
-        setTimeout(() => onPageChange('home'), 1500);
-      }
     });
+    if (!result.isConfirmed) return;
+
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: (() => {
+          const token = localStorage.getItem('shopmaster_session_token');
+          return token ? { Authorization: `Bearer ${token}` } : {};
+        })()
+      });
+    } catch (error) {
+      console.warn('Logout request failed:', error);
+    }
+
+    localStorage.removeItem('shopmaster_session_token');
+    sessionStorage.removeItem('authUser');
+    sessionStorage.removeItem('authToken');
+    window.dispatchEvent(new Event('userChanged'));
+    Swal.fire({
+      icon: 'success',
+      title: 'Signed Out',
+      text: 'You have been signed out successfully',
+      timer: 1200,
+      showConfirmButton: false
+    }).then(() => onPageChange('home'));
   };
 
   const searchContainerClass = `search-box-container mx-3 d-none d-md-flex ${activePage === 'p' ? 'd-none' : ''}`;
