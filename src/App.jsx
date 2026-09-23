@@ -771,8 +771,8 @@ function App() {
           name: item.id,
           quantity: item.quantity,
           price: item.cost,
-          sellerEmail: item.sellerEmail || "rohan.sivaa@gmail.com",
-          sellerName: item.sellerName || "Rohan"
+          sellerEmail: item.sellerEmail,
+          sellerName: item.sellerName
         })),
         cart: groupedCart.map((item) => ({
           id: item.id,
