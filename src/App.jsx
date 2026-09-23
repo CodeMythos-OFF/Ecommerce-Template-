@@ -1345,6 +1345,8 @@ function App() {
                       onShowDetails={showProductDetails}
                       onAddCart={handleAddToCart}
                       onRemoveCart={handleRemoveFromCart}
+                      isWishlisted={isWishlisted}
+                      onToggleWishlist={handleToggleWishlist}
                       onViewAll={() => {
                         setSelectedCategories([cat]);
                         handlePageChange("p");
