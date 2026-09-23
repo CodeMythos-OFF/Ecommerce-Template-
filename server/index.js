@@ -277,6 +277,20 @@ productSchema.index({ id: 1, sellerEmail: 1 }, { unique: true });
 
 const Product = mongoose.model('Product', productSchema);
 
+const reviewSchema = new mongoose.Schema({
+  productId: { type: String, required: true, index: true },
+  orderId: { type: String, required: true },
+  userEmail: { type: String, required: true },
+  userName: { type: String, required: true },
+  rating: { type: Number, required: true, min: 1, max: 5 },
+  comment: { type: String, default: '' },
+  verifiedPurchase: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+reviewSchema.index({ productId: 1, orderId: 1, userEmail: 1 }, { unique: true });
+const Review = mongoose.model('Review', reviewSchema);
+
 // Order Schema (updated with cart field for complete product details)
 const orderSchema = new mongoose.Schema({
   trackingId: { type: String, required: true, unique: true },
@@ -1132,6 +1146,91 @@ app.post('/api/stats/view', async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Track view error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== PRODUCT REVIEW ROUTES ==========
+
+app.get('/api/reviews/product/:productId', async (req, res) => {
+  try {
+    const productId = String(req.params.productId || '').trim();
+    if (!productId) return res.status(400).json({ error: 'Product ID is required' });
+
+    const reviews = await Review.find({ productId }).sort({ createdAt: -1 }).limit(100).lean().maxTimeMS(5000);
+    const summary = await Review.aggregate([
+      { $match: { productId } },
+      { $group: { _id: null, averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } }
+    ]);
+
+    res.json({
+      reviews,
+      averageRating: summary[0] ? Number(summary[0].averageRating.toFixed(1)) : 0,
+      reviewCount: summary[0]?.reviewCount || 0
+    });
+  } catch (error) {
+    console.error('Get product reviews error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/reviews', async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) return res.status(401).json({ error: 'Please sign in to write a review' });
+
+    const productId = String(req.body?.productId || '').trim();
+    const orderId = String(req.body?.orderId || '').trim();
+    const rating = Number(req.body?.rating);
+    const comment = String(req.body?.comment || '').trim();
+
+    if (!productId || !orderId) return res.status(400).json({ error: 'Product and order are required' });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    if (comment.length > 1000) return res.status(400).json({ error: 'Review must be 1000 characters or less' });
+
+    const order = await Order.findOne({
+      _id: orderId,
+      user: sessionUser.email.toLowerCase(),
+      status: 'Delivered',
+      $or: [
+        { 'cart.id': productId },
+        { 'products.name': productId }
+      ]
+    }).lean().maxTimeMS(5000);
+
+    if (!order) return res.status(403).json({ error: 'You can review this product only after it has been delivered to your account' });
+
+    const product = await Product.findOne({ id: productId }).lean().maxTimeMS(5000);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const review = await Review.findOneAndUpdate(
+      { productId, orderId, userEmail: sessionUser.email.toLowerCase() },
+      {
+        productId,
+        orderId,
+        userEmail: sessionUser.email.toLowerCase(),
+        userName: sessionUser.name || sessionUser.email.split('@')[0],
+        rating,
+        comment,
+        verifiedPurchase: true,
+        updatedAt: new Date()
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const summary = await Review.aggregate([
+      { $match: { productId } },
+      { $group: { _id: null, averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } }
+    ]);
+    const averageRating = summary[0] ? Number(summary[0].averageRating.toFixed(1)) : 0;
+    const reviewCount = summary[0]?.reviewCount || 0;
+
+    await Product.updateMany({ id: productId }, { $set: { averageRating, reviewCount, updatedAt: new Date() } });
+
+    res.status(201).json({ success: true, review, averageRating, reviewCount });
+  } catch (error) {
+    console.error('Submit review error:', error);
+    if (error?.code === 11000) return res.status(409).json({ error: 'You have already reviewed this product for this order' });
     res.status(500).json({ error: error.message });
   }
 });
