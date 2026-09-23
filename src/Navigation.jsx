@@ -137,6 +137,13 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
               Cart ({cartCount})
             </a>
           </li>
+          {currentUser && (
+            <li className={activePage === 'wishlist' ? 'active-nav-link' : ''}>
+              <a href="#wishlist" onClick={go('wishlist')}>
+                Wishlist
+              </a>
+            </li>
+          )}
           {!currentUser ? (
             <li className={activePage === 'login' ? 'active-nav-link' : ''}>
               <a href="#login" onClick={go('login')}>
@@ -196,6 +203,18 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
             <span className="nav-label">Cart</span>
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
           </button>
+
+          {/* Wishlist */}
+          {currentUser && (
+            <button
+              className={`nav-item ${activePage === 'wishlist' ? 'active' : ''}`}
+              onClick={go('wishlist')}
+              aria-label="Wishlist"
+            >
+              <span className="nav-icon">❤️</span>
+              <span className="nav-label">Wishlist</span>
+            </button>
+          )}
 
           {/* User/Login */}
           {!currentUser ? (
