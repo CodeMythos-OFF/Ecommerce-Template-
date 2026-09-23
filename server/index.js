@@ -834,22 +834,33 @@ app.post('/api/sellers/apply', async (req, res) => {
 
 app.post('/api/sellers/register', async (req, res) => {
   try {
-    const { email, name, businessName, phone, address } = req.body;
-    
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) return res.status(401).json({ error: 'Authentication is required' });
+
+    const { name, businessName, phone, address } = req.body;
+    const email = sessionUser.email.toLowerCase();
+    const safeName = String(name || sessionUser.name || '').trim();
+    const safeBusinessName = String(businessName || '').trim();
+
+    if (!safeName || !safeBusinessName) {
+      return res.status(400).json({ error: 'Name and business name are required' });
+    }
+
     const existing = await Seller.findOne({ email }).maxTimeMS(5000);
     if (existing) {
-      return res.status(400).json({ error: 'Seller already registered with this email' });
+      return res.status(400).json({ error: 'Seller already registered with this account' });
     }
-    
+
     const seller = await Seller.create({
       email,
-      name,
-      businessName,
-      phone,
-      address,
-      isApproved: email.toLowerCase() === SUPER_ADMIN_EMAIL
+      name: safeName,
+      businessName: safeBusinessName,
+      phone: String(phone || '').trim(),
+      address: String(address || '').trim(),
+      isApproved: email === SUPER_ADMIN_EMAIL,
+      isSuperAdmin: email === SUPER_ADMIN_EMAIL
     });
-    
+
     res.status(201).json(seller);
   } catch (error) {
     console.error('Register seller error:', error);
