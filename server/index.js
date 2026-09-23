@@ -1386,7 +1386,48 @@ app.post('/api/orders', async (req, res) => {
       return res.status(403).json({ error: 'You can only place orders for your own account' });
     }
 
-    const baseSubtotal = Math.max(0, Number(subtotal) + (Number(discountAmount) || 0));
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ error: 'Your cart is empty or invalid' });
+    }
+
+    const trustedProducts = [];
+    let baseSubtotal = 0;
+
+    for (const item of products) {
+      const productId = String(item?.name || '').trim();
+      const sellerEmail = String(item?.sellerEmail || '').trim().toLowerCase();
+      const quantity = Number(item?.quantity);
+
+      if (!productId || !sellerEmail || !Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+        return res.status(400).json({ error: 'Invalid product or quantity in cart' });
+      }
+
+      const product = await Product.findOne({
+        id: productId,
+        sellerEmail,
+        isActive: true
+      }).maxTimeMS(5000);
+
+      if (!product) {
+        return res.status(400).json({ error: `Product "${productId}" is no longer available from this seller` });
+      }
+
+      if (quantity > product.stock) {
+        return res.status(400).json({ error: `Only ${product.stock} unit(s) of "${productId}" are available` });
+      }
+
+      const trustedPrice = Number(product.cost);
+      baseSubtotal += trustedPrice * quantity;
+      trustedProducts.push({
+        name: product.id,
+        quantity,
+        price: trustedPrice,
+        sellerEmail: product.sellerEmail,
+        sellerName: product.sellerName
+      });
+    }
+
+    baseSubtotal = Math.round(baseSubtotal);
     let calculatedDiscount = 0;
     let calculatedSubtotal = baseSubtotal;
     let calculatedShipping = Math.round(baseSubtotal * 0.05);
@@ -1428,14 +1469,27 @@ app.post('/api/orders', async (req, res) => {
       trackingId,
       user,
       userName,
-      items,
+      items: trustedProducts.reduce((sum, item) => sum + item.quantity, 0),
       subtotal: calculatedSubtotal,
       discountAmount: calculatedDiscount,
       couponCode: normalizedCouponCode,
       shippingAmount: calculatedShipping,
       total: calculatedTotal,
-      products,
-      cart: cart || [],  // Store full cart items with images and details
+      products: trustedProducts,
+      cart: trustedProducts.map((item) => {
+        const source = Array.isArray(cart) ? cart.find((cartItem) =>
+          String(cartItem?.id || '') === item.name
+        ) : null;
+        const product = {
+          id: item.name,
+          cost: item.price,
+          img: source?.img || '',
+          brand: source?.brand || '',
+          category: source?.category || '',
+          quantity: item.quantity
+        };
+        return product;
+      }),  // Store trusted price/seller data with client display metadata
       address
     });
 
