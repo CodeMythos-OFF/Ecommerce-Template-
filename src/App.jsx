@@ -4,6 +4,7 @@ import Auth from "./Auth";
 import GoogleAuthService from "./services/GoogleAuthService";
 import AdminPanel from "./AdminPanel";
 import OrderHistory from "./OrderHistory";
+import ProductReviews from "./ProductReviews";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsOfService from "./TermsOfService";
 import SellerApplication from "./SellerApplication";
@@ -24,6 +25,7 @@ const ROUTES = {
   "#home": "home",
   "#p": "p",
   "#pdetails": "pdetails",
+  "#reviews": "reviews",
   "#login": "login",
   "#privacy": "privacy",
   "#terms": "terms",
@@ -1154,6 +1156,12 @@ function App() {
                       <div><strong>Delivery</strong><span>{shippingText}</span></div>
                     </div>
                   )}
+
+                  <div className="mb-3">
+                    <button className="btn btn-outline-warning w-100" onClick={() => handlePageChange("reviews")}>
+                      <i className="bi bi-star-fill me-1"></i> Read & Write Reviews
+                    </button>
+                  </div>
 
                   <div className="product-action-stack">
                     <button className="btn btn-primary product-buy-button" onClick={() => handleAddToCart(product)}>
