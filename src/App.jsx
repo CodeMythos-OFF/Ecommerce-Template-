@@ -690,8 +690,8 @@ function App() {
         const location = window.__shopmasterDigipinLocation;
         if (!location?.digipin) { Swal.showValidationMessage("Please tap Get My DIGIPIN first."); return false; }
         if (!name || !phone || !street || !city || !state || !pincode) { Swal.showValidationMessage("Please fill all required fields"); return false; }
-        if (!/^\\d{10}$/.test(phone)) { Swal.showValidationMessage("Please enter a valid 10-digit phone number"); return false; }
-        if (!/^\\d{6}$/.test(pincode)) { Swal.showValidationMessage("Please enter a valid 6-digit PIN code"); return false; }
+        if (!/^\d{10}$/.test(phone)) { Swal.showValidationMessage("Please enter a valid 10-digit phone number"); return false; }
+        if (!/^\d{6}$/.test(pincode)) { Swal.showValidationMessage("Please enter a valid 6-digit PIN code"); return false; }
         return { name, phone, street, city, state, pincode, country, saveAddress, digipin: location.digipin, latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy };
       }
     });
