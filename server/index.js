@@ -1110,7 +1110,9 @@ app.post('/api/stats/view', async (req, res) => {
   }
 });
 
-// ========== ORDER ROUTES ==========\n\n// Coupon configuration
+// ========== ORDER ROUTES ==========
+
+// Coupon configuration
 const COUPONS = {
   WELCOME10: { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 0, label: '10% off' },
   SAVE100: { code: 'SAVE100', type: 'fixed', value: 100, minSubtotal: 1000, label: '₹100 off on orders of ₹1,000+' },
