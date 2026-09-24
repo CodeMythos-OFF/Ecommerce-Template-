@@ -9,6 +9,7 @@ import PrivacyPolicy from "./PrivacyPolicy";
 import TermsOfService from "./TermsOfService";
 import SellerApplication from "./SellerApplication";
 import Wishlist from "./Wishlist";
+import CustomerAccount from "./CustomerAccount";
 import { getWishlist, toggleWishlist } from "./wishlistService";
 import "./SellerApplication.css";
 import "./App.css";
@@ -21,6 +22,7 @@ const AUTH_API_URL = window.location.hostname === 'localhost' ? 'http://localhos
 
 const ROUTES = {
   "#dashboard": "dashboard",
+  "#account": "account",
   "#orderhistory": "orderhistory",
   "#admin": "admin",
   "#Cart": "Cart",
@@ -1476,6 +1478,12 @@ function App() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div id="account" className={`page ${activePage === "account" ? "active" : ""}`}>
+        {currentUser ? <CustomerAccount currentUser={currentUser} onPageChange={handlePageChange} /> : (
+          <div className="container py-5 text-center"><div className="card p-5"><h2>Sign in to view your account</h2><button className="btn btn-primary mt-3" onClick={() => handlePageChange("login")}>Sign In</button></div></div>
+        )}
       </div>
 
       <div id="dashboard" className={`page ${activePage === "dashboard" ? "active" : ""}`}>
