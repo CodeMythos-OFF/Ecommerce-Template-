@@ -592,30 +592,65 @@ const AdminPanel = ({ currentUser }) => {
         </button>
       </div>
 
-      <div className="admin-tabs mb-4">
-        <button className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('dashboard')}>
-          <i className="bi bi-speedometer2"></i> Dashboard
-        </button>
-        <button className={`btn ${activeTab === 'orders' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('orders')}>
-          <i className="bi bi-cart-check"></i> Orders
-        </button>
-        <button className={`btn ${activeTab === 'products' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('products')}>
-          <i className="bi bi-box-seam"></i> Products
-        </button>
-        {currentUser?.isSuperAdmin && (
-          <>
-            <button className={`btn ${activeTab === 'sellers' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('sellers')}>
-              <i className="bi bi-people"></i> Sellers & Approvals
+      <div className="admin-workspace">
+        <aside className="admin-sidebar" aria-label="Admin navigation">
+          <div className="admin-sidebar-brand">
+            <div className="admin-brand-mark"><i className="bi bi-grid-1x2-fill"></i></div>
+            <div>
+              <strong>ShopMaster</strong>
+              <span>{currentUser?.isSuperAdmin ? 'Super Admin' : 'Seller Console'}</span>
+            </div>
+          </div>
+
+          <div className="admin-nav-section">
+            <span className="admin-nav-label">Workspace</span>
+            <button className={`admin-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+              <i className="bi bi-speedometer2"></i><span>Overview</span>
             </button>
-            <button className={`btn ${activeTab === 'emails' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('emails')}>
-              <i className="bi bi-envelope"></i> Automated Emails
+            <button className={`admin-nav-item ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
+              <i className="bi bi-bag-check"></i><span>Orders</span><b>{orders.length}</b>
             </button>
-            <button className={`btn ${activeTab === 'coupons' ? 'btn-primary' : 'btn-outline-primary'} me-2`} onClick={() => setActiveTab('coupons')}>
-              <i className="bi bi-ticket-perforated"></i> Coupons
+            <button className={`admin-nav-item ${activeTab === 'products' ? 'active' : ''}`} onClick={() => setActiveTab('products')}>
+              <i className="bi bi-box-seam"></i><span>Products</span><b>{products.length}</b>
             </button>
-          </>
-        )}
-      </div>
+          </div>
+
+          {currentUser?.isSuperAdmin && (
+            <div className="admin-nav-section">
+              <span className="admin-nav-label">Management</span>
+              <button className={`admin-nav-item ${activeTab === 'sellers' ? 'active' : ''}`} onClick={() => setActiveTab('sellers')}>
+                <i className="bi bi-people"></i><span>Sellers</span><b>{sellers.filter((seller) => !seller.isApproved).length || ''}</b>
+              </button>
+              <button className={`admin-nav-item ${activeTab === 'coupons' ? 'active' : ''}`} onClick={() => setActiveTab('coupons')}>
+                <i className="bi bi-ticket-perforated"></i><span>Coupons</span><b>{coupons.length || ''}</b>
+              </button>
+              <button className={`admin-nav-item ${activeTab === 'emails' ? 'active' : ''}`} onClick={() => setActiveTab('emails')}>
+                <i className="bi bi-envelope-paper"></i><span>Email automation</span>
+              </button>
+            </div>
+          )}
+
+          <div className="admin-sidebar-footer">
+            <div className={`admin-connection ${backendOnline ? 'online' : 'offline'}`}>
+              <span className="admin-status-dot"></span>
+              <div><strong>{backendOnline ? 'System online' : 'Backend offline'}</strong><small>{backendOnline ? 'MongoDB connected' : 'Check deployment'}</small></div>
+            </div>
+          </div>
+        </aside>
+
+        <main className="admin-content">
+          <div className="admin-mobile-nav">
+            {[
+              ['dashboard', 'Overview', 'speedometer2'],
+              ['orders', 'Orders', 'bag-check'],
+              ['products', 'Products', 'box-seam'],
+              ...(currentUser?.isSuperAdmin ? [['sellers', 'Sellers', 'people'], ['coupons', 'Coupons', 'ticket-perforated'], ['emails', 'Emails', 'envelope-paper']] : [])
+            ].map(([key, label, icon]) => (
+              <button key={key} className={activeTab === key ? 'active' : ''} onClick={() => setActiveTab(key)}>
+                <i className={`bi bi-${icon}`}></i>{label}
+              </button>
+            ))}
+          </div>
 
 
       {activeTab === 'coupons' && currentUser?.isSuperAdmin && (
@@ -1528,6 +1563,8 @@ const AdminPanel = ({ currentUser }) => {
           </div>
         </div>
       )}
+        </main>
+      </div>
     </div>
   );
 };
