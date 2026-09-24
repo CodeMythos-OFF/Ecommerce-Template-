@@ -285,6 +285,7 @@ function App() {
   const [tempMinPrice, setTempMinPrice] = useState("");
   const [tempMaxPrice, setTempMaxPrice] = useState("");
   const [sortBy, setSortBy] = useState("featured");
+  const [inStockOnly, setInStockOnly] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -481,11 +482,15 @@ function App() {
     setTempMaxPrice("");
     setSearch("");
     setSortBy("featured");
+    setInStockOnly(false);
   }, []);
 
   const filteredProducts = useMemo(() => {
     let filtered = products.filter((product) => {
-      const matchesSearch = product.id.toLowerCase().includes(search.toLowerCase());
+      const searchText = search.trim().toLowerCase();
+      const matchesSearch = !searchText || [product.id, product.brand, product.category, product.description, product.sellerBusinessName, product.sellerName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(searchText));
       const matchesCategory =
         selectedCategories.length === 0 || selectedCategories.includes(product.category);
       const productBrand = getBrandName(product);
@@ -495,7 +500,8 @@ function App() {
       const min = minPrice === "" ? 0 : parseFloat(minPrice);
       const max = maxPrice === "" ? Infinity : parseFloat(maxPrice);
       const matchesPrice = product.cost >= min && product.cost <= max;
-      return matchesSearch && matchesCategory && matchesBrand && matchesPrice && matchesRating;
+      const matchesStock = !inStockOnly || Number(product.stock ?? 0) > 0;
+      return matchesSearch && matchesCategory && matchesBrand && matchesPrice && matchesRating && matchesStock;
     });
 
     switch (sortBy) {
@@ -526,6 +532,7 @@ function App() {
     minPrice,
     maxPrice,
     sortBy,
+    inStockOnly,
   ]);
 
   const showProductDetails = useCallback(
@@ -907,6 +914,7 @@ function App() {
     minRating > 0 ||
     minPrice !== "" ||
     maxPrice !== "" ||
+    inStockOnly ||
     search !== "";
 
   return (
@@ -916,8 +924,10 @@ function App() {
         onPageChange={handlePageChange}
         cartCount={cartItems.length}
         isAdmin={isAdmin}
+        currentUser={currentUser}
         search={search}
         setSearch={setSearch}
+        searchSuggestions={products.filter((p) => search.trim() && [p.id, p.brand, p.category].filter(Boolean).some((v) => String(v).toLowerCase().includes(search.trim().toLowerCase()))).slice(0, 6)}
       />
 
       <div id="admin" className={`page ${activePage === "admin" ? "active" : ""}`}>
@@ -1419,6 +1429,29 @@ function App() {
                           </li>
                         ))}
                       </ul>
+                      <div className="cart-phase1-tools mb-3">
+                        <div className="small fw-semibold text-muted mb-2">Cart controls</div>
+                        {groupedCart.map((item) => {
+                          const liveProduct = products.find((p) => String(p.id) === String(item.id));
+                          const priceChanged = liveProduct && Number(liveProduct.cost) !== Number(item.cost);
+                          const stock = liveProduct ? Number(liveProduct.stock ?? 0) : null;
+                          return (
+                            <div key={`cart-control-${item.id}`} className="cart-control-row">
+                              <div className="min-w-0">
+                                <strong className="d-block text-truncate">{item.id}</strong>
+                                {priceChanged && <span className="small text-warning">Price changed to ₹{liveProduct.cost}</span>}
+                                {liveProduct && stock <= 5 && <span className="small text-danger d-block">{stock > 0 ? `Only ${stock} left` : "Out of stock"}</span>}
+                              </div>
+                              <div className="btn-group btn-group-sm">
+                                <button type="button" className="btn btn-outline-secondary" onClick={() => handleRemoveFromCart(item)}>-</button>
+                                <span className="btn btn-light disabled">{item.quantity}</span>
+                                <button type="button" className="btn btn-outline-secondary" disabled={stock !== null && item.quantity >= stock} onClick={() => handleAddToCart(liveProduct || item)}>+</button>
+                                <button type="button" className="btn btn-outline-danger" title="Save for later" onClick={() => { toggleWishlist(currentUser.email, liveProduct || item); handleRemoveFromCart(item); }}>♡</button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                       <div className="cart-summary border-top pt-3">
                         <div className="d-flex justify-content-between align-items-center mb-1">
                           <span className="text-muted">Subtotal:</span>
