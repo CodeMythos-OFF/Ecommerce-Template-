@@ -13,10 +13,11 @@ const NAV_ICONS = {
   login: '🔓'
 };
 
-export default function Navigation({ activePage, onPageChange, search, setSearch, cartCount = 0, currentUser: appUser = null }) {
+export default function Navigation({ activePage, onPageChange, search, setSearch, cartCount = 0, currentUser: appUser = null, searchSuggestions = [] }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const userMenuRef = useRef(null);
 
   useEffect(() => {
@@ -109,14 +110,28 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
         </h2>
 
         <div className={searchContainerClass}>
-          <input
-            type="text"
-            className="form-control border-0 bg-light"
-            placeholder="Search for products..."
-            value={search}
-            onChange={handleSearch}
-            aria-label="Search products"
-          />
+          <div className="navigation-search-wrap">
+            <input
+              type="text"
+              className="form-control border-0 bg-light"
+              placeholder="Search products, brands or categories..."
+              value={search}
+              onChange={handleSearch}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              aria-label="Search products"
+            />
+            {searchFocused && search.trim() && searchSuggestions.length > 0 && (
+              <div className="search-suggestions">
+                {searchSuggestions.map((product) => (
+                  <button key={product.id} type="button" onMouseDown={() => { setSearch(product.id); onPageChange("p"); }}>
+                    <img src={product.img} alt="" />
+                    <span><strong>{product.id}</strong><small>{product.brand || product.category || "Product"}</small></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <button
@@ -164,9 +179,9 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
               </a>
             </li>
           ) : (
-            <li ref={userMenuRef} className={activePage === 'dashboard' ? 'active-nav-link' : ''} style={{ position: 'relative' }}>
-              <a href="#dashboard" onClick={go('dashboard')}>
-                {currentUser.name ? currentUser.name.split(' ')[0] : 'User'}
+            <li ref={userMenuRef} className={activePage === 'account' ? 'active-nav-link' : ''} style={{ position: 'relative' }}>
+              <a href="#dashboard" onClick={go('account')}>
+                {currentUser.name ? currentUser.name.split(' ')[0] : 'Account'}
               </a>
             </li>
           )}
@@ -177,9 +192,10 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
         <input
           type="text"
           className="form-control border-0 bg-light"
-          placeholder="Search for products..."
+          placeholder="Search products, brands or categories..."
           value={search}
           onChange={handleSearch}
+          aria-label="Search products"
         />
       </div>
 
@@ -242,7 +258,7 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
           ) : (
             <button
               className={`nav-item ${activePage === 'dashboard' ? 'active' : ''}`}
-              onClick={go('dashboard')}
+              onClick={go('account')}
               aria-label="Profile"
             >
               <span className="nav-icon">{NAV_ICONS.user}</span>
