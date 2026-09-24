@@ -560,7 +560,18 @@ function App() {
         });
         return;
       }
-      const updatedCart = addToCart(currentUser.email, product, cartItems);
+      const liveProduct = products.find((item) => String(item.id) === String(product.id)) || product;
+      const stock = Number(liveProduct.stock ?? 0);
+      const currentQuantity = cartItems.filter((item) => String(item.id) === String(product.id)).length;
+      if (stock <= 0) {
+        Swal.fire({ icon: "warning", title: "Out of stock", text: "This product is currently unavailable." });
+        return;
+      }
+      if (currentQuantity >= stock) {
+        Swal.fire({ icon: "info", title: "Stock limit reached", text: `Only ${stock} item${stock === 1 ? "" : "s"} available.` });
+        return;
+      }
+      const updatedCart = addToCart(currentUser.email, liveProduct, cartItems);
       setCartItems(updatedCart);
       Swal.fire({
         icon: "success",
@@ -608,6 +619,16 @@ function App() {
     (productId) => wishlistItems.some((item) => String(item.id) === String(productId)),
     [wishlistItems]
   );
+
+  const handleSaveForLater = useCallback((product) => {
+    if (!currentUser) return;
+    const liveProduct = products.find((item) => String(item.id) === String(product.id)) || product;
+    const updatedWishlist = toggleWishlist(currentUser.email, liveProduct);
+    setWishlistItems(updatedWishlist);
+    const updatedCart = removeFromCart(currentUser.email, product, cartItems);
+    setCartItems(updatedCart);
+    Swal.fire({ icon: "success", title: "Saved for later", text: liveProduct.id, timer: 1000, showConfirmButton: false, toast: true, position: "top-end" });
+  }, [currentUser, products, cartItems]);
 
   const handleRemoveFromCart = useCallback(
     (product) => {
@@ -1448,7 +1469,7 @@ function App() {
                                 <button type="button" className="btn btn-outline-secondary" onClick={() => handleRemoveFromCart(item)}>-</button>
                                 <span className="btn btn-light disabled">{item.quantity}</span>
                                 <button type="button" className="btn btn-outline-secondary" disabled={stock !== null && item.quantity >= stock} onClick={() => handleAddToCart(liveProduct || item)}>+</button>
-                                <button type="button" className="btn btn-outline-danger" title="Save for later" onClick={() => { toggleWishlist(currentUser.email, liveProduct || item); handleRemoveFromCart(item); }}>♡</button>
+                                <button type="button" className="btn btn-outline-danger" title="Save for later" onClick={() => handleSaveForLater(liveProduct || item)}>♡</button>
                               </div>
                             </div>
                           );
