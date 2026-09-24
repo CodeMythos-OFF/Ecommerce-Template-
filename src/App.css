@@ -2363,3 +2363,46 @@ footer,
     font-size: 1.65rem;
   }
 }
+
+/* ===== Phase 1 cart + customer account ===== */
+.cart-phase1-tools { padding: 14px; background: #f8fafc; border: 1px solid var(--sm-border, #e7ebf0); border-radius: 14px; }
+.cart-control-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #e9edf2; }
+.cart-control-row:first-of-type { border-top: 0; }
+.cart-control-row > div:first-child { min-width: 0; }
+.customer-account-page { max-width: 1180px; }
+.account-hero { display: flex; align-items: center; gap: 18px; padding: 28px; border-radius: 22px; color: #fff; background: linear-gradient(135deg, #172033, #087f8c); box-shadow: 0 16px 40px rgba(23,32,51,.14); }
+.account-avatar { width: 76px; height: 76px; border-radius: 22px; display: grid; place-items: center; background: rgba(255,255,255,.14); font-size: 2rem; overflow: hidden; flex: 0 0 auto; }
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-hero h1 { font-weight: 800; letter-spacing: -.03em; }
+.account-hero p { color: rgba(255,255,255,.75); }
+.account-hero .section-kicker { color: #7fe2e9; }
+.account-link-card { min-height: 118px; padding: 18px; border: 1px solid var(--sm-border,#e7ebf0); border-radius: 16px; background: #fff; box-shadow: 0 5px 18px rgba(23,32,51,.05); display: flex; flex-direction: column; gap: 5px; }
+.account-link-card:hover { border-color: #c8dfe2; transform: translateY(-2px); box-shadow: 0 10px 26px rgba(23,32,51,.09); }
+.account-link-card i { color: var(--sm-primary,#087f8c); font-size: 1.35rem; }
+.account-link-card strong { color: #172033; }
+.account-link-card span { color: #667085; font-size: .82rem; }
+.account-panel { background: #fff; border: 1px solid var(--sm-border,#e7ebf0); border-radius: 18px; padding: 24px; box-shadow: 0 6px 24px rgba(23,32,51,.05); }
+.account-panel h2 { margin: 3px 0 18px; font-size: 1.3rem; color: #172033; }
+.saved-address-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px; border: 1px solid #e7ebf0; border-radius: 13px; margin-top: 10px; }
+.saved-address-card strong, .saved-address-card p, .saved-address-card small { display: block; }
+.saved-address-card p { margin: 4px 0; color: #4d596b; font-size: .88rem; }
+.saved-address-card small { color: #7b8494; }
+.address-label { display: inline-block; padding: 3px 8px; margin-bottom: 5px; border-radius: 999px; background: #eef9fa; color: #087f8c; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.account-empty { padding: 30px 10px; text-align: center; color: #667085; }
+.account-empty i { font-size: 2rem; color: #087f8c; }
+.account-empty p { margin: 8px 0 2px; font-weight: 700; color: #172033; }
+.account-form label { display:block; margin: 7px 0 5px; font-size: .78rem; font-weight: 700; color: #4d596b; }
+.account-form input, .account-form select { width:100%; min-height:42px; border:1px solid #dfe5eb; border-radius:10px; padding:8px 10px; background:#fff; }
+.account-form input:focus, .account-form select:focus { outline: none; border-color:#087f8c; box-shadow:0 0 0 3px rgba(8,127,140,.1); }
+.account-settings { display:grid; gap:10px; }
+.account-settings > div { display:flex; gap:12px; align-items:flex-start; padding:13px; border-radius:12px; background:#f8fafc; }
+.account-settings i { color:#087f8c; font-size:1.2rem; }
+.account-settings strong, .account-settings small { display:block; }
+.account-settings small { color:#667085; margin-top:2px; }
+@media (max-width: 767.98px) {
+  .account-hero { padding:20px; border-radius:18px; }
+  .account-avatar { width:58px; height:58px; border-radius:17px; }
+  .account-hero h1 { font-size:1.45rem; }
+  .saved-address-card { align-items:flex-start; flex-direction:column; }
+  .cart-control-row { align-items:flex-start; flex-direction:column; }
+}
