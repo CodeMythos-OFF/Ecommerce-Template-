@@ -687,6 +687,18 @@ function App() {
             </div>
             <div id="coupon-result" class="small mt-2"></div>
           </div>
+          <div class="p-3 mb-3 rounded-3" style="background:#fffaf0;border:1px solid #ffe0a3">
+            <div class="fw-bold"><i class="bi bi-cash-coin text-success"></i> Payment method</div>
+            <div class="mt-2 d-flex align-items-center gap-2">
+              <span class="badge bg-success">Cash on Delivery</span>
+              <span class="small text-muted">Pay when your order arrives.</span>
+            </div>
+            <div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> Online payment is not available for this store.</div>
+          </div>
+          <div class="p-3 mb-3 rounded-3" style="background:#f8f9fa;border:1px solid #dee2e6">
+            <div class="fw-bold"><i class="bi bi-arrow-return-left"></i> Return policy</div>
+            <div class="small text-muted mt-1">No returns are offered for these products.</div>
+          </div>
           <div id="checkout-summary" class="p-3 mb-3 rounded-3" style="background:#f0fff4;border:1px solid #cce8d1">
             <div class="d-flex justify-content-between small"><span>Subtotal:</span><span>₹${subtotal}</span></div>
             <div class="d-flex justify-content-between small d-none"><span>Coupon discount:</span><span>-₹0</span></div>
@@ -826,6 +838,7 @@ function App() {
         couponCode: appliedCoupon?.code || "",
         shippingAmount: finalShipping,
         total: finalTotal,
+        paymentMethod: "COD",
         products: groupedCart.map((item) => ({
           name: item.id,
           quantity: item.quantity,
