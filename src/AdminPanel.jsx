@@ -60,6 +60,12 @@ const AdminPanel = ({ currentUser }) => {
     category: '',
     brand: '',
     description: '',
+    stock: 100,
+    isActive: true,
+    variantsJson: '',
+    specificationsJson: '',
+    imagesJson: '',
+    relatedProductIdsJson: '',
     sellerEmail: ''
   });
 
@@ -315,11 +321,32 @@ const AdminPanel = ({ currentUser }) => {
 
     setProductLoading(true);
     try {
+      let variants = [];
+      let specifications = {};
+      let images = [];
+      let relatedProductIds = [];
+      try {
+        variants = newProduct.variantsJson?.trim() ? JSON.parse(newProduct.variantsJson) : [];
+        specifications = newProduct.specificationsJson?.trim() ? JSON.parse(newProduct.specificationsJson) : {};
+        images = newProduct.imagesJson?.trim() ? JSON.parse(newProduct.imagesJson) : [];
+        relatedProductIds = newProduct.relatedProductIdsJson?.trim() ? JSON.parse(newProduct.relatedProductIdsJson) : [];
+        if (!Array.isArray(variants) || typeof specifications !== 'object' || Array.isArray(specifications) || !Array.isArray(images) || !Array.isArray(relatedProductIds)) {
+          throw new Error('Variants/specifications/images/related products must use the documented JSON formats.');
+        }
+      } catch (jsonError) {
+        throw new Error('Invalid product metadata JSON. Check the Variants, Specifications, Images, and Related Product IDs fields.');
+      }
+
       const productData = {
         ...newProduct,
         cost,
         year: parseInt(newProduct.year),
-        brand: newProduct.brand?.trim() || undefined,
+        stock: Math.max(0, parseInt(newProduct.stock, 10) || 0),
+        isActive: Boolean(newProduct.isActive),
+        variants,
+        specifications,
+        images,
+        relatedProductIds,
         sellerEmail: currentUser?.isSuperAdmin ? newProduct.sellerEmail : currentUser?.email
       };
 
@@ -354,6 +381,12 @@ const AdminPanel = ({ currentUser }) => {
         category: '',
         brand: '',
         description: '',
+        stock: 100,
+        isActive: true,
+        variantsJson: '',
+        specificationsJson: '',
+        imagesJson: '',
+        relatedProductIdsJson: '',
         sellerEmail: ''
       });
       setImagePreview(null);
@@ -380,6 +413,12 @@ const AdminPanel = ({ currentUser }) => {
       category: product.category || '',
       brand: product.brand || product.sellerBusinessName || '',
       description: product.description || '',
+      stock: product.stock ?? 100,
+      isActive: product.isActive !== false,
+      variantsJson: JSON.stringify(product.variants || [], null, 2),
+      specificationsJson: JSON.stringify(product.specifications || {}, null, 2),
+      imagesJson: JSON.stringify(product.images || [], null, 2),
+      relatedProductIdsJson: JSON.stringify(product.relatedProductIds || [], null, 2),
       sellerEmail: product.sellerEmail || ''
     });
     setImagePreview(product.img || null);
@@ -1475,6 +1514,34 @@ const AdminPanel = ({ currentUser }) => {
                         rows="3"
                         required
                       />
+                    </div>
+                    <div className="row g-3 mb-3">
+                      <div className="col-md-6">
+                        <label className="form-label">Stock *</label>
+                        <input type="number" min="0" className="form-control" value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} />
+                      </div>
+                      <div className="col-md-6 d-flex align-items-end">
+                        <div className="form-check mb-2">
+                          <input className="form-check-input" type="checkbox" checked={newProduct.isActive} onChange={(e) => setNewProduct({ ...newProduct, isActive: e.target.checked })} id="product-active" />
+                          <label className="form-check-label" htmlFor="product-active">Product active</label>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Variants (JSON)</label>
+                      <textarea className="form-control font-monospace" rows="3" value={newProduct.variantsJson} onChange={(e) => setNewProduct({ ...newProduct, variantsJson: e.target.value })} placeholder='[{"name":"Color","options":["Black","White"]},{"name":"Storage","options":["128GB","256GB"]}]' />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Specifications (JSON)</label>
+                      <textarea className="form-control font-monospace" rows="3" value={newProduct.specificationsJson} onChange={(e) => setNewProduct({ ...newProduct, specificationsJson: e.target.value })} placeholder='{"Display":"6.7 inch","Battery":"5000 mAh"}' />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Additional Images (JSON array)</label>
+                      <textarea className="form-control font-monospace" rows="2" value={newProduct.imagesJson} onChange={(e) => setNewProduct({ ...newProduct, imagesJson: e.target.value })} placeholder='["https://.../image2.jpg","https://.../image3.jpg"]' />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Related Product IDs (JSON array)</label>
+                      <textarea className="form-control font-monospace" rows="2" value={newProduct.relatedProductIdsJson} onChange={(e) => setNewProduct({ ...newProduct, relatedProductIdsJson: e.target.value })} placeholder='["Wireless headphone","Smart Watch"]' />
                     </div>
 
                     <div className="d-grid gap-2">
