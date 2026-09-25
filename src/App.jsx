@@ -540,6 +540,14 @@ function App() {
   const showProductDetails = useCallback(
     (product) => {
       setSelectedProduct(product);
+      try {
+        const key = "shopmaster_recently_viewed";
+        const existing = JSON.parse(localStorage.getItem(key) || "[]");
+        const next = [product.id, ...existing.filter((id) => String(id) !== String(product.id))].slice(0, 12);
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch (error) {
+        console.warn("Could not save recently viewed product:", error);
+      }
       handlePageChange("pdetails");
     },
     [handlePageChange]
@@ -1220,6 +1228,11 @@ function App() {
           const discount = hasDiscount ? Math.round(((mrp - price) / mrp) * 100) : 0;
 
           const highlights = [];
+          const additionalImages = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+          const variantOptions = Array.isArray(product.variants) ? product.variants : [];
+          const specifications = product.specifications && typeof product.specifications === "object"
+            ? Object.entries(product.specifications)
+            : [];
 
           if (brand) {
             highlights.push({ icon: "bi-award", label: "Brand", value: brand });
@@ -1257,6 +1270,13 @@ function App() {
                 <div className="product-gallery">
                   <div className="product-category-pill">{product.category || "Product"}</div>
                   <img src={product.img} className="product-main-image" alt={product.id} />
+                  {additionalImages.length > 0 && (
+                    <div className="product-thumbnail-row">
+                      {[product.img, ...additionalImages].slice(0, 6).map((image, index) => (
+                        <img key={image + index} src={image} alt={`${product.id} view ${index + 1}`} className="product-thumbnail" />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="product-buy-panel">
@@ -1315,6 +1335,39 @@ function App() {
               </div>
 
               <div className="product-information-grid">
+                {variantOptions.length > 0 && (
+                  <section className="product-info-card">
+                    <div className="section-kicker">AVAILABLE OPTIONS</div>
+                    <h2>Choose your variant</h2>
+                    <div className="d-grid gap-2">
+                      {variantOptions.map((variant, index) => (
+                        <div className="border rounded-3 p-3" key={index}>
+                          <strong>{variant?.name || "Option"}</strong>
+                          <div className="d-flex flex-wrap gap-2 mt-2">
+                            {(Array.isArray(variant?.options) ? variant.options : []).map((option) => <span className="badge text-bg-light border" key={String(option)}>{String(option)}</span>)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {specifications.length > 0 && (
+                  <section className="product-info-card">
+                    <div className="section-kicker">SPECIFICATIONS</div>
+                    <h2>Technical details</h2>
+                    <div className="product-spec-list">
+                      {specifications.map(([key, value]) => (
+                        <div className="product-spec-row" key={key}>
+                          <span className="spec-icon"><i className="bi bi-list-check"></i></span>
+                          <span className="spec-label">{key}</span>
+                          <strong>{String(value)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
                 <section className="product-info-card product-description-card">
                   <div className="section-kicker">ABOUT THIS PRODUCT</div>
                   <h2>Everything you need to know</h2>
@@ -1370,6 +1423,20 @@ function App() {
                   </div>
                 </section>
               </div>
+
+              {Array.isArray(product.relatedProductIds) && product.relatedProductIds.length > 0 && (
+                <section className="product-related-section">
+                  <div className="section-kicker">YOU MAY ALSO LIKE</div>
+                  <h2>Related products</h2>
+                  <div className="row g-3">
+                    {product.relatedProductIds.map((id) => products.find((item) => String(item.id) === String(id))).filter(Boolean).slice(0, 4).map((related) => (
+                      <div className="col-6 col-lg-3" key={related.id}>
+                        <ProductCard product={related} quantity={cartItems.filter((item) => String(item.id) === String(related.id)).length} onShowDetails={showProductDetails} onAddCart={handleAddToCart} onRemoveCart={handleRemoveFromCart} isWishlisted={isWishlisted(related)} onToggleWishlist={handleToggleWishlist} />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <div className="product-bottom-actions">
                 <button className="btn btn-primary" onClick={() => handleAddToCart(product)}>
