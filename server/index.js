@@ -330,7 +330,10 @@ const orderSchema = new mongoose.Schema({
     digipin: { type: String },
     latitude: { type: Number },
     longitude: { type: Number },
-    accuracy: { type: Number }
+    accuracy: { type: Number },
+    locationTimestamp: { type: Date },
+    displayAddress: { type: String },
+    district: { type: String }
   },
   createdAt: { type: Date, default: Date.now },
   status: { type: String, default: 'Order Placed' }
