@@ -1513,6 +1513,7 @@ app.post('/api/orders', async (req, res) => {
 
     // Reserve stock atomically before creating the order.
     const reserved = [];
+    let stockReserved = false;
     try {
       for (const item of trustedProducts) {
         const result = await Product.findOneAndUpdate(
@@ -1523,6 +1524,7 @@ app.post('/api/orders', async (req, res) => {
         if (!result) throw new Error(`Stock changed while checking "${item.name}". Please refresh and try again.`);
         reserved.push(item);
       }
+      stockReserved = true;
     } catch (reservationError) {
       for (const item of reserved) {
         await Product.updateOne(
@@ -1574,6 +1576,8 @@ app.post('/api/orders', async (req, res) => {
       }),  // Store trusted price/seller data with client display metadata
       address
     });
+
+    stockReserved = false;
 
     // Update stats
     let stats = await Stats.findOne().maxTimeMS(5000);
