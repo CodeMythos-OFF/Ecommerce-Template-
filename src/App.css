@@ -2406,3 +2406,7 @@ footer,
   .saved-address-card { align-items:flex-start; flex-direction:column; }
   .cart-control-row { align-items:flex-start; flex-direction:column; }
 }
+
+
+/* Phase 2 product gallery */
+.product-thumbnail-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;justify-content:center}.product-thumbnail{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid #e7ebf0;background:#fff}.product-related-section{margin-top:2rem;padding:1.5rem;border-radius:16px;background:#f6f8fb}.product-related-section h2{margin:.25rem 0 1rem}.font-monospace{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace!important}
