@@ -271,6 +271,10 @@ const productSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   averageRating: { type: Number, default: 0 },
   reviewCount: { type: Number, default: 0 },
+  images: { type: [String], default: [] },
+  variants: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  specifications: { type: Map, of: String, default: {} },
+  relatedProductIds: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -304,6 +308,8 @@ const orderSchema = new mongoose.Schema({
   couponCode: { type: String, default: '' },
   shippingAmount: { type: Number, default: 0 },
   total: { type: Number, required: true },
+  paymentMethod: { type: String, enum: ['COD'], default: 'COD', required: true },
+  returnPolicy: { type: String, default: 'No returns' },
   products: [{
     name: String,
     quantity: Number,
@@ -1012,7 +1018,7 @@ app.post('/api/products', async (req, res) => {
     const access = await requireProductManager(req, res);
     if (!access) return;
 
-    const { id, year, cost, img, category, description, brand, sellerEmail: requestedSellerEmail } = req.body;
+    const { id, year, cost, img, category, description, brand, sellerEmail: requestedSellerEmail, stock, isActive, images, variants, specifications, relatedProductIds } = req.body;
     const targetEmail = access.isSuperAdmin
       ? String(requestedSellerEmail || '').toLowerCase()
       : access.sessionUser.email.toLowerCase();
@@ -1034,6 +1040,12 @@ app.post('/api/products', async (req, res) => {
     const product = await Product.create({
       id, year, cost, img, category, description,
       brand: String(brand || seller.businessName || '').trim(),
+      stock: Number.isInteger(Number(stock)) ? Math.max(0, Number(stock)) : 100,
+      isActive: isActive !== false,
+      images: Array.isArray(images) ? images.filter(Boolean).slice(0, 10) : [],
+      variants: Array.isArray(variants) ? variants.slice(0, 20) : [],
+      specifications: specifications && typeof specifications === 'object' ? specifications : {},
+      relatedProductIds: Array.isArray(relatedProductIds) ? relatedProductIds.slice(0, 20) : [],
       sellerEmail: seller.email,
       sellerId: String(seller._id),
       sellerName: seller.name,
@@ -1052,7 +1064,7 @@ app.put('/api/products/:id', async (req, res) => {
     const access = await requireProductManager(req, res);
     if (!access) return;
 
-    const { year, cost, img, category, description, brand, stock, isActive } = req.body;
+    const { year, cost, img, category, description, brand, stock, isActive, images, variants, specifications, relatedProductIds } = req.body;
     const filter = { id: req.params.id };
     if (access.isSuperAdmin && req.body.sellerEmail) {
       filter.sellerEmail = String(req.body.sellerEmail).toLowerCase();
@@ -1070,7 +1082,11 @@ app.put('/api/products/:id', async (req, res) => {
     product.description = description || product.description;
     product.brand = brand !== undefined ? String(brand).trim() : (product.brand || product.sellerBusinessName);
     product.stock = stock !== undefined ? stock : product.stock;
-    product.isActive = isActive !== undefined ? isActive : product.isActive;
+    product.isActive = isActive !== undefined ? Boolean(isActive) : product.isActive;
+    if (images !== undefined) product.images = Array.isArray(images) ? images.filter(Boolean).slice(0, 10) : [];
+    if (variants !== undefined) product.variants = Array.isArray(variants) ? variants.slice(0, 20) : [];
+    if (specifications !== undefined) product.specifications = specifications && typeof specifications === 'object' ? specifications : {};
+    if (relatedProductIds !== undefined) product.relatedProductIds = Array.isArray(relatedProductIds) ? relatedProductIds.slice(0, 20) : [];
     product.updatedAt = new Date();
 
     await product.save();
@@ -1418,7 +1434,10 @@ const generateTrackingId = () => {
 // Create order with email notification
 app.post('/api/orders', async (req, res) => {
   try {
-    const { user, userName, items, subtotal, discountAmount, couponCode, shippingAmount, total, products, cart, address } = req.body;
+    const { user, userName, items, subtotal, discountAmount, couponCode, shippingAmount, total, products, cart, address, paymentMethod } = req.body;
+    if (String(paymentMethod || 'COD').toUpperCase() !== 'COD') {
+      return res.status(400).json({ error: 'Only Cash on Delivery is available.' });
+    }
 
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email || sessionUser.email.toLowerCase() !== String(user || '').toLowerCase()) {
@@ -1492,6 +1511,28 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ error: 'Complete address information is required' });
     }
 
+    // Reserve stock atomically before creating the order.
+    const reserved = [];
+    try {
+      for (const item of trustedProducts) {
+        const result = await Product.findOneAndUpdate(
+          { id: item.name, sellerEmail: item.sellerEmail, isActive: true, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity }, $set: { updatedAt: new Date() } },
+          { new: true }
+        ).maxTimeMS(5000);
+        if (!result) throw new Error(`Stock changed while checking "${item.name}". Please refresh and try again.`);
+        reserved.push(item);
+      }
+    } catch (reservationError) {
+      for (const item of reserved) {
+        await Product.updateOne(
+          { id: item.name, sellerEmail: item.sellerEmail },
+          { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }
+        ).catch(() => {});
+      }
+      return res.status(409).json({ error: reservationError.message });
+    }
+
     // Generate unique tracking ID
     let trackingId;
     let attempts = 0;
@@ -1514,6 +1555,8 @@ app.post('/api/orders', async (req, res) => {
       couponCode: normalizedCouponCode,
       shippingAmount: calculatedShipping,
       total: calculatedTotal,
+      paymentMethod: 'COD',
+      returnPolicy: 'No returns',
       products: trustedProducts,
       cart: trustedProducts.map((item) => {
         const source = Array.isArray(cart) ? cart.find((cartItem) =>
