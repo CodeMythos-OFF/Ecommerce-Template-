@@ -701,9 +701,18 @@ function App() {
                 ${savedAddresses.map((addr) => `<option value="${addr.id}">${addr.name || "Address"} - ${addr.street}, ${addr.city}</option>`).join("")}
               </select>
             </div>` : ""}
-          <div class="p-3 mb-3 rounded-3" style="background:#f0f8ff;border:1px solid #cfe8ff"><div class="fw-bold"><i class="bi bi-geo-alt-fill text-primary"></i> India Post DIGIPIN</div><div class="small text-muted mt-1">Use high-accuracy device location to generate a 10-character DIGIPIN. No Google Maps or billing is required.</div></div>
-          <button id="use-location-btn" class="btn btn-primary w-100 mb-3"><i class="bi bi-crosshair"></i> Get My DIGIPIN</button>
-          <div id="digipin-result" class="d-none p-3 mb-3 rounded-3 text-center" style="background:#f8f9fa;border:1px solid #dee2e6"><div class="small text-muted">Delivery location</div><div id="digipin-value" class="fw-bold fs-4">—</div><div id="digipin-accuracy" class="small text-muted mt-1"></div><div id="digipin-coordinates" class="small text-muted"></div></div>
+          <div class="p-3 mb-3 rounded-3" style="background:#f0f8ff;border:1px solid #cfe8ff">
+            <div class="fw-bold"><i class="bi bi-crosshair text-primary"></i> Precise GPS delivery location</div>
+            <div class="small text-muted mt-1">We use your device's best high-accuracy GPS fix first. DIGIPIN is generated from those exact coordinates as a secondary reference.</div>
+          </div>
+          <button id="use-location-btn" class="btn btn-primary w-100 mb-3"><i class="bi bi-crosshair"></i> Detect Precise Location</button>
+          <div id="digipin-result" class="d-none p-3 mb-3 rounded-3" style="background:#f8f9fa;border:1px solid #dee2e6">
+            <div class="fw-bold text-center mb-2"><i class="bi bi-check-circle text-success"></i> Location captured</div>
+            <div id="gps-address" class="small mb-2 text-center"></div>
+            <div class="d-flex justify-content-between small"><span>GPS accuracy</span><strong id="digipin-accuracy">—</strong></div>
+            <div class="d-flex justify-content-between small mt-1"><span>DIGIPIN</span><strong id="digipin-value">—</strong></div>
+            <div id="digipin-coordinates" class="small text-muted mt-2 text-center"></div>
+          </div>
           <div class="mb-3"><label class="form-label fw-bold">Full Name *</label><input id="swal-name" class="form-control" placeholder="Your Name" required></div>
           <div class="mb-3"><label class="form-label fw-bold">Phone Number *</label><input id="swal-phone" class="form-control" type="tel" placeholder="10-digit number" maxlength="10" required></div>
           <div class="mb-3"><label class="form-label fw-bold">Street/House No *</label><input id="swal-street" class="form-control" placeholder="Street address" required></div>
@@ -724,7 +733,18 @@ function App() {
       cancelButtonText: "Cancel",
       focusConfirm: false,
       didOpen: () => {
-        const showPin = (x) => { document.getElementById("digipin-result").classList.remove("d-none"); document.getElementById("digipin-value").textContent = x.digipin; document.getElementById("digipin-accuracy").textContent = x.accuracy ? `Device accuracy: ~${x.accuracy} m` : "Device accuracy unavailable"; document.getElementById("digipin-coordinates").textContent = `Coordinates: ${x.latitude.toFixed(6)}, ${x.longitude.toFixed(6)}`; };
+        const showPin = (x) => {
+          document.getElementById("digipin-result").classList.remove("d-none");
+          document.getElementById("digipin-value").textContent = x.digipin || "Unavailable";
+          document.getElementById("digipin-accuracy").textContent = x.accuracy ? `±${x.accuracy} m` : "Unavailable";
+          document.getElementById("digipin-coordinates").textContent = `GPS: ${Number(x.latitude).toFixed(7)}, ${Number(x.longitude).toFixed(7)}`;
+          const address = x.displayAddress || [x.street, x.city, x.state, x.pincode].filter(Boolean).join(", ");
+          document.getElementById("gps-address").textContent = address || "Coordinates captured; address lookup unavailable.";
+          ["street","city","state","pincode","country"].forEach((key) => {
+            const field = document.getElementById("swal-" + key);
+            if (field && x[key]) field.value = x[key];
+          });
+        };
         document.getElementById("apply-coupon-btn").addEventListener("click", async () => {
           const input = document.getElementById("swal-coupon");
           const result = document.getElementById("coupon-result");
@@ -761,8 +781,16 @@ function App() {
         });
         document.getElementById("use-location-btn").addEventListener("click", async (event) => {
           event.preventDefault(); const button = event.currentTarget; button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Getting location...';
-          try { const location = await getLocationAddress(); window.__shopmasterDigipinLocation = location; showPin(location); button.innerHTML = '<i class="bi bi-check-circle"></i> DIGIPIN captured'; }
-          catch (error) { Swal.showValidationMessage(error.message); button.disabled = false; button.innerHTML = '<i class="bi bi-crosshair"></i> Get My DIGIPIN'; }
+          try {
+            const location = await getLocationAddress();
+            window.__shopmasterDigipinLocation = location;
+            showPin(location);
+            button.innerHTML = '<i class="bi bi-check-circle"></i> Precise GPS captured';
+          } catch (error) {
+            Swal.showValidationMessage(error.message);
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-crosshair"></i> Detect Precise Location';
+          }
         });
         const select = document.getElementById("swal-address-select");
         if (select) select.addEventListener("change", (event) => { const selected = savedAddresses.find((x) => x.id === Number(event.target.value)); if (!selected) return; ["name","phone","street","city","state","pincode","country"].forEach((key) => { const field = document.getElementById("swal-" + key); if (field) field.value = selected[key] || ""; }); if (selected.digipin) { window.__shopmasterDigipinLocation = selected; showPin(selected); } });
@@ -777,11 +805,11 @@ function App() {
         const country = document.getElementById("swal-country").value.trim();
         const saveAddress = document.getElementById("swal-save-address").checked;
         const location = window.__shopmasterDigipinLocation;
-        if (!location?.digipin) { Swal.showValidationMessage("Please tap Get My DIGIPIN first."); return false; }
+        if (!location?.digipin || !Number.isFinite(Number(location.latitude)) || !Number.isFinite(Number(location.longitude))) { Swal.showValidationMessage("Please detect and confirm your precise GPS location first."); return false; }
         if (!name || !phone || !street || !city || !state || !pincode) { Swal.showValidationMessage("Please fill all required fields"); return false; }
         if (!/^\d{10}$/.test(phone)) { Swal.showValidationMessage("Please enter a valid 10-digit phone number"); return false; }
         if (!/^\d{6}$/.test(pincode)) { Swal.showValidationMessage("Please enter a valid 6-digit PIN code"); return false; }
-        return { name, phone, street, city, state, pincode, country, saveAddress, digipin: location.digipin, latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy };
+        return { name, phone, street, city, state, pincode, country, saveAddress, digipin: location.digipin, latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy, locationTimestamp: location.locationTimestamp, displayAddress: location.displayAddress || "" };
       }
     });
 
@@ -817,7 +845,8 @@ function App() {
           name: formValues.name, phone: formValues.phone, street: formValues.street,
           city: formValues.city, state: formValues.state, pincode: formValues.pincode,
           country: formValues.country, digipin: formValues.digipin,
-          latitude: formValues.latitude, longitude: formValues.longitude, accuracy: formValues.accuracy
+          latitude: formValues.latitude, longitude: formValues.longitude, accuracy: formValues.accuracy,
+          locationTimestamp: formValues.locationTimestamp, displayAddress: formValues.displayAddress
         }
       };
 
