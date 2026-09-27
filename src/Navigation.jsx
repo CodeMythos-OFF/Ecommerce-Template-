@@ -19,6 +19,11 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const userMenuRef = useRef(null);
+  const hasAdminAccess = Boolean(
+    currentUser?.isAdmin === true ||
+    currentUser?.isSuperAdmin === true ||
+    currentUser?.email?.toLowerCase() === 'codemythos@outlook.com'
+  );
 
   useEffect(() => {
     const user = appUser || getCurrentUser();
@@ -165,6 +170,13 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
               Cart ({cartCount})
             </a>
           </li>
+          {hasAdminAccess && (
+            <li className={activePage === 'admin' ? 'active-nav-link' : ''}>
+              <a href="#admin" onClick={go('admin')}>
+                <i className="bi bi-shield-lock me-1"></i> Admin Panel
+              </a>
+            </li>
+          )}
           {currentUser && (
             <li className={activePage === 'wishlist' ? 'active-nav-link' : ''}>
               <a href="#wishlist" onClick={go('wishlist')}>
@@ -242,6 +254,18 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
             >
               <span className="nav-icon">❤️</span>
               <span className="nav-label">Wishlist</span>
+            </button>
+          )}
+
+          {/* Admin */}
+          {hasAdminAccess && (
+            <button
+              className={`nav-item ${activePage === 'admin' ? 'active' : ''}`}
+              onClick={go('admin')}
+              aria-label="Admin Panel"
+            >
+              <span className="nav-icon">🛡️</span>
+              <span className="nav-label">Admin</span>
             </button>
           )}
 
