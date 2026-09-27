@@ -291,6 +291,7 @@ function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const hasAdminAccess = isAdmin || currentUser?.isAdmin === true || currentUser?.isSuperAdmin === true;
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -399,7 +400,7 @@ function App() {
     if (!authChecked) return;
     const enforceRoute = () => {
       const nextPage = resolveRoute(window.location.hash);
-      if (nextPage === "admin" && !isAdmin) {
+      if (nextPage === "admin" && !hasAdminAccess) {
         Swal.fire({
           icon: "error",
           title: "Access Denied",
@@ -414,7 +415,7 @@ function App() {
     enforceRoute();
     window.addEventListener("hashchange", enforceRoute);
     return () => window.removeEventListener("hashchange", enforceRoute);
-  }, [authChecked, isAdmin]);
+  }, [authChecked, hasAdminAccess]);
 
   const categories = useMemo(
     () =>
@@ -438,7 +439,7 @@ function App() {
 
   const handlePageChange = useCallback(
     (pageId) => {
-      if (pageId === "admin" && !isAdmin) {
+      if (pageId === "admin" && !hasAdminAccess) {
         Swal.fire({
           icon: "error",
           title: "Admin access only",
@@ -454,7 +455,7 @@ function App() {
         setSelectedProduct(null);
       }
     },
-    [isAdmin]
+    [hasAdminAccess]
   );
 
   const toggleCategory = useCallback((category) => {
@@ -1700,7 +1701,7 @@ function App() {
                     </div>
                   </div>
                 )}
-                {isAdmin && (
+                {hasAdminAccess && (
                   <div className="col-md-6" onClick={() => handlePageChange("admin")} style={{ cursor: "pointer" }}>
                     <div className="card shadow-sm border-0 h-100 action-card hover-lift">
                       <div className="card-body d-flex align-items-center p-4">
