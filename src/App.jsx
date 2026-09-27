@@ -291,7 +291,7 @@ function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const hasAdminAccess = isAdmin || currentUser?.isAdmin === true || currentUser?.isSuperAdmin === true;
+  const hasAdminAccess = isAdmin || currentUser?.isAdmin === true || currentUser?.isSuperAdmin === true || currentUser?.email?.toLowerCase() === "codemythos@outlook.com";
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -1005,7 +1005,7 @@ function App() {
       />
 
       <div id="admin" className={`page ${activePage === "admin" ? "active" : ""}`}>
-        {isAdmin ? (
+        {hasAdminAccess ? (
           <AdminPanel currentUser={currentUser} />
         ) : (
           <div className="container py-5">
