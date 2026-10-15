@@ -9,6 +9,7 @@ import { createMicrosoftAuthUrl, exchangeMicrosoftCode, getMicrosoftAccessToken,
 dotenv.config();
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
 const AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET;
@@ -20,7 +21,7 @@ const ADMIN_EMAILS = [
 // Backward-compatible alias for any older code paths that still reference ADMIN_EMAIL.
 const ADMIN_EMAIL = ADMIN_EMAILS[0];
 const SUPER_ADMIN_EMAIL = 'codemythos@outlook.com';
-const SUPER_ADMIN_DELETE_PIN = process.env.SUPER_ADMIN_DELETE_PIN || '2014';
+const SUPER_ADMIN_DELETE_PIN = process.env.SUPER_ADMIN_DELETE_PIN;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
@@ -32,6 +33,10 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
   // Google Identity Services uses window.postMessage for the sign-in popup.
   // Allow the popup communication without weakening other security headers.
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
@@ -49,8 +54,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Super-Admin-Pin', 'X-Product-Seller-Email']
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '1mb', strict: true }));
+app.use(express.urlencoded({ limit: '1mb', extended: false, parameterLimit: 100 }));
 
 
 // ========== AUTHENTICATION HELPERS ==========
@@ -156,8 +161,8 @@ const requireProductManager = async (req, res) => {
 };
 
 const verifySuperAdminPin = (req) => {
-  const pin = req.headers['x-super-admin-pin'] || req.body?.pin || req.query?.pin;
-  return typeof pin === 'string' && pin === SUPER_ADMIN_DELETE_PIN;
+  const pin = req.headers['x-super-admin-pin'];
+  return Boolean(SUPER_ADMIN_DELETE_PIN && typeof pin === 'string' && pin.length >= 12 && pin === SUPER_ADMIN_DELETE_PIN);
 };
 
 // MongoDB Connection with proper error handling
@@ -879,14 +884,17 @@ app.post('/api/sellers/register', async (req, res) => {
 
 app.get('/api/sellers/:email', async (req, res) => {
   try {
-    const seller = await Seller.findOne({ email: req.params.email }).maxTimeMS(5000);
+    const email = String(req.params.email || '').trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid seller email' });
+    const seller = await Seller.findOne({ email }).maxTimeMS(5000);
     if (!seller) {
       return res.status(404).json({ error: 'Seller not found' });
     }
-    res.json(seller);
+    // Public seller lookup returns storefront-safe fields only.
+    res.json({ email: seller.email, name: seller.name, businessName: seller.businessName, isApproved: seller.isApproved, createdAt: seller.createdAt });
   } catch (error) {
-    console.error('Get seller error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Get seller error:', error.message);
+    res.status(500).json({ error: 'Unable to retrieve seller information' });
   }
 });
 
@@ -1513,7 +1521,6 @@ app.post('/api/orders', async (req, res) => {
 
     // Reserve stock atomically before creating the order.
     const reserved = [];
-    let stockReserved = false;
     try {
       for (const item of trustedProducts) {
         const result = await Product.findOneAndUpdate(
@@ -1524,7 +1531,6 @@ app.post('/api/orders', async (req, res) => {
         if (!result) throw new Error(`Stock changed while checking "${item.name}". Please refresh and try again.`);
         reserved.push(item);
       }
-      stockReserved = true;
     } catch (reservationError) {
       for (const item of reserved) {
         await Product.updateOne(
@@ -1542,12 +1548,17 @@ app.post('/api/orders', async (req, res) => {
       trackingId = generateTrackingId();
       attempts++;
       if (attempts > 10) {
+        for (const item of reserved) {
+          await Product.updateOne({ id: item.name, sellerEmail: item.sellerEmail }, { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }).catch(() => {});
+        }
         return res.status(500).json({ error: 'Failed to generate unique tracking ID' });
       }
     } while (await Order.findOne({ trackingId }).maxTimeMS(5000));
 
     // Create order with both products (for summary) and cart (for display)
-    const order = await Order.create({
+    let order;
+    try {
+      order = await Order.create({
       trackingId,
       user,
       userName,
@@ -1575,9 +1586,13 @@ app.post('/api/orders', async (req, res) => {
         return product;
       }),  // Store trusted price/seller data with client display metadata
       address
-    });
-
-    stockReserved = false;
+      });
+    } catch (orderCreateError) {
+      for (const item of reserved) {
+        await Product.updateOne({ id: item.name, sellerEmail: item.sellerEmail }, { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }).catch(() => {});
+      }
+      throw orderCreateError;
+    }
 
     // Update stats
     let stats = await Stats.findOne().maxTimeMS(5000);
