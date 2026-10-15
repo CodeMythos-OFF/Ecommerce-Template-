@@ -17,7 +17,7 @@
     "@fortawesome/react-fontawesome": "^3.1.0",
     "firebase": "^12.7.0",
     "mongodb": "^7.0.0",
-    "nodemailer": "^7.0.12",
+    "nodemailer": "^10.0.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sweetalert2": "^11.26.3"
