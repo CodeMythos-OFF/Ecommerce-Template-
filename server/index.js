@@ -720,7 +720,7 @@ app.get('/api/email/microsoft/authorize', async (req, res) => {
     res.redirect(url);
   } catch (error) {
     console.error('Microsoft authorization start failed:', error);
-    res.status(500).send(`Microsoft authorization could not start: ${error.message}`);
+    res.status(500).send('Microsoft authorization could not start. Please check the backend configuration.');
   }
 });
 
@@ -755,7 +755,7 @@ app.get('/api/email/microsoft/callback', async (req, res) => {
     res.redirect((process.env.FRONTEND_PUBLIC_URL || 'https://testsampleindev.vercel.app') + '/#admin');
   } catch (error) {
     console.error('Microsoft email callback failed:', error);
-    res.status(500).send(`Microsoft email connection failed: ${error.message}`);
+    res.status(500).send('Microsoft email connection failed. Please restart the connection and check server logs.');
   }
 });
 
@@ -765,7 +765,7 @@ app.get('/api/email/status', async (req, res) => {
     if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
     const integration = await MicrosoftEmail.findOne().select('accountEmail updatedAt').lean();
     res.json({ configured: isMicrosoftEmailConfigured(), connected: Boolean(integration), accountEmail: integration?.accountEmail || null, updatedAt: integration?.updatedAt || null, redirectUri: getMicrosoftRedirectUri() });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
 app.get('/api/email/templates', async (req, res) => {
@@ -773,7 +773,7 @@ app.get('/api/email/templates', async (req, res) => {
     const access = await getAccessContext(req);
     if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access is required' });
     res.json(await EmailTemplate.find().sort({ key: 1 }).maxTimeMS(5000));
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
 app.put('/api/email/templates/:key', async (req, res) => {
@@ -783,7 +783,7 @@ app.put('/api/email/templates/:key', async (req, res) => {
     if (!DEFAULT_EMAIL_TEMPLATES[req.params.key]) return res.status(404).json({ error: 'Unknown email template' });
     const template = await EmailTemplate.findOneAndUpdate({ key: req.params.key }, { $set: { subject: String(req.body.subject || ''), text: String(req.body.text || ''), html: String(req.body.html || ''), enabled: req.body.enabled !== false, updatedAt: new Date() } }, { new: true, upsert: true });
     res.json({ success: true, template });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
 app.post('/api/email/test', async (req, res) => {
@@ -797,7 +797,7 @@ app.post('/api/email/test', async (req, res) => {
     await sendMicrosoftEmail({ accessToken: mail.accessToken, to, subject: 'ShopMaster test email', text: 'Your ShopMaster Microsoft email connection is working.' });
     integration.encryptedTokenCache = mail.cache; await integration.save();
     res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ========== SELLER ROUTES ==========
@@ -842,7 +842,7 @@ app.post('/api/sellers/apply', async (req, res) => {
     });
   } catch (error) {
     console.error('Seller application error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -878,7 +878,7 @@ app.post('/api/sellers/register', async (req, res) => {
     res.status(201).json(seller);
   } catch (error) {
     console.error('Register seller error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -909,7 +909,7 @@ app.get('/api/sellers', async (req, res) => {
     res.json(sellers);
   } catch (error) {
     console.error('Get all sellers error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -940,7 +940,7 @@ app.put('/api/sellers/:email/approve', async (req, res) => {
     res.json({ success: true, seller, message: 'Seller approved successfully' });
   } catch (error) {
     console.error('Approve seller error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -970,7 +970,7 @@ app.put('/api/sellers/:email/revoke', async (req, res) => {
     res.json({ success: true, seller, message: 'Seller access revoked' });
   } catch (error) {
     console.error('Revoke seller error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -989,7 +989,7 @@ app.get('/api/products', async (req, res) => {
     res.json(products);
   } catch (error) {
     console.error('Get products error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1004,7 +1004,7 @@ app.get('/api/sellers/:email/products', async (req, res) => {
     res.json(products);
   } catch (error) {
     console.error('Get seller products error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1017,7 +1017,7 @@ app.get('/api/products/:id', async (req, res) => {
     res.json(product);
   } catch (error) {
     console.error('Get product error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1069,7 +1069,7 @@ app.post('/api/products', async (req, res) => {
     res.status(201).json(product);
   } catch (error) {
     console.error('Add product error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1112,7 +1112,7 @@ app.put('/api/products/:id', async (req, res) => {
     res.json(product);
   } catch (error) {
     console.error('Update product error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1140,7 +1140,7 @@ app.delete('/api/products/:id', async (req, res) => {
     res.json({ message: 'Product deleted successfully', product });
   } catch (error) {
     console.error('Delete product error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1183,7 +1183,7 @@ app.get('/api/stats', async (req, res) => {
     }
   } catch (error) {
     console.error('Get stats error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1210,7 +1210,7 @@ app.post('/api/stats/view', async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Track view error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1239,7 +1239,7 @@ app.get('/api/reviews/product/:productId', async (req, res) => {
     });
   } catch (error) {
     console.error('Get product reviews error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1258,7 +1258,7 @@ app.get('/api/reviews/mine/:productId', async (req, res) => {
     res.json({ orderIds: reviews.map((review) => String(review.orderId)) });
   } catch (error) {
     console.error('Get my product review history error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1316,7 +1316,7 @@ app.post('/api/reviews', async (req, res) => {
   } catch (error) {
     console.error('Submit review error:', error);
     if (error?.code === 11000) return res.status(409).json({ error: 'You have already reviewed this product for this order' });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1366,7 +1366,7 @@ app.post('/api/coupons/validate', async (req, res) => {
     if (!result.valid) return res.status(400).json({ error: result.error });
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1376,7 +1376,7 @@ app.get('/api/coupons', async (req, res) => {
     if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Only the super admin can manage coupons' });
     res.json(await Coupon.find().sort({ createdAt: -1 }).maxTimeMS(5000));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1402,7 +1402,7 @@ app.post('/api/coupons', async (req, res) => {
     res.status(201).json(coupon);
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ error: 'That coupon code already exists' });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1428,7 +1428,7 @@ app.put('/api/coupons/:id', async (req, res) => {
     res.json(coupon);
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ error: 'That coupon code already exists' });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1440,7 +1440,7 @@ app.delete('/api/coupons/:id', async (req, res) => {
     if (!coupon) return res.status(404).json({ error: 'Coupon not found' });
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1632,7 +1632,7 @@ app.post('/api/orders', async (req, res) => {
     });
   } catch (error) {
     console.error('Create order error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1664,7 +1664,7 @@ app.get('/api/orders', async (req, res) => {
     res.json(orders);
   } catch (error) {
     console.error('Get orders error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1691,7 +1691,7 @@ app.get('/api/orders/:id', async (req, res) => {
     res.json(order);
   } catch (error) {
     console.error('Get order error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1719,7 +1719,7 @@ app.delete('/api/orders/:id', async (req, res) => {
     res.json({ message: 'Order deleted permanently from database', deletedOrder: order });
   } catch (error) {
     console.error('Delete order error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1758,7 +1758,7 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
 
     res.json({ message: 'Order status updated successfully', order });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
