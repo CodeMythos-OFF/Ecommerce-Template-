@@ -1032,7 +1032,7 @@ app.post('/api/products', async (req, res) => {
       : access.sessionUser.email.toLowerCase();
 
     if (!targetEmail) return res.status(400).json({ error: 'Seller email is required' });
-    if (typeof id !== 'string' || id.trim().length < 2 || id.trim().length > 120 || !Number.isFinite(Number(year)) || Number(year) < 1900 || Number(year) > 2100 || !Number.isFinite(Number(cost)) || Number(cost) < 0 || typeof img !== 'string' || img.length > 2048 || typeof category !== 'string' || category.trim().length < 1 || category.length > 100 || typeof description !== 'string' || description.trim().length < 1 || description.length > 5000) {
+    if (typeof id !== 'string' || id.trim().length < 2 || id.trim().length > 120 || !Number.isInteger(Number(year)) || Number(year) < 1900 || Number(year) > 2100 || !Number.isFinite(Number(cost)) || Number(cost) < 0 || typeof img !== 'string' || img.length > 2048 || typeof category !== 'string' || category.trim().length < 1 || category.length > 100 || typeof description !== 'string' || description.trim().length < 1 || description.length > 5000) {
       return res.status(400).json({ error: 'Invalid product fields or values' });
     }
     if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0 || Number(stock) > 1000000)) {
@@ -1445,10 +1445,7 @@ app.delete('/api/coupons/:id', async (req, res) => {
 });
 
 // Generate unique tracking ID
-const generateTrackingId = () => {
-  const randomNum = Math.floor(100000 + Math.random() * 900000); // 6-digit number
-  return `SM${randomNum}`;
-};
+const generateTrackingId = () => `SM${crypto.randomInt(100000, 1000000)}`;
 
 // Create order with email notification
 app.post('/api/orders', async (req, res) => {
@@ -1463,8 +1460,8 @@ app.post('/api/orders', async (req, res) => {
       return res.status(403).json({ error: 'You can only place orders for your own account' });
     }
 
-    if (!Array.isArray(products) || products.length === 0) {
-      return res.status(400).json({ error: 'Your cart is empty or invalid' });
+    if (!Array.isArray(products) || products.length === 0 || products.length > 100) {
+      return res.status(400).json({ error: 'Your cart must contain between 1 and 100 product lines' });
     }
 
     const trustedProducts = [];
@@ -1526,8 +1523,9 @@ app.post('/api/orders', async (req, res) => {
     }
 
     // Validate address
-    if (!address || !address.name || !address.street || !address.city || !address.state || !address.pincode || !address.phone) {
-      return res.status(400).json({ error: 'Complete address information is required' });
+    if (!address || !address.name || !address.street || !address.city || !address.state || !address.pincode || !address.phone ||
+        [address.name, address.street, address.city, address.state, address.pincode, address.phone].some((value) => typeof value !== 'string' || !value.trim() || value.length > 250)) {
+      return res.status(400).json({ error: 'Complete, valid address information is required' });
     }
 
     // Reserve stock atomically before creating the order.
@@ -1572,7 +1570,7 @@ app.post('/api/orders', async (req, res) => {
       order = await Order.create({
       trackingId,
       user,
-      userName,
+      userName: String(sessionUser.name || sessionUser.email.split('@')[0]).slice(0, 120),
       items: trustedProducts.reduce((sum, item) => sum + item.quantity, 0),
       subtotal: calculatedSubtotal,
       discountAmount: calculatedDiscount,
