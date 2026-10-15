@@ -885,7 +885,7 @@ app.post('/api/sellers/register', async (req, res) => {
 app.get('/api/sellers/:email', async (req, res) => {
   try {
     const email = String(req.params.email || '').trim().toLowerCase();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid seller email' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid seller email' });
     const seller = await Seller.findOne({ email }).maxTimeMS(5000);
     if (!seller) {
       return res.status(404).json({ error: 'Seller not found' });
