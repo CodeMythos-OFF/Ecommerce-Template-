@@ -262,8 +262,8 @@ const Seller = mongoose.model('Seller', sellerSchema);
 // Product Schema
 const productSchema = new mongoose.Schema({
   id: { type: String, required: true },
-  year: { type: Number, required: true },
-  cost: { type: Number, required: true },
+  year: { type: Number, required: true, min: 1900, max: 2100 },
+  cost: { type: Number, required: true, min: 0 },
   img: { type: String, required: true },
   category: { type: String, required: true },
   description: { type: String, required: true },
@@ -272,7 +272,7 @@ const productSchema = new mongoose.Schema({
   sellerName: { type: String, required: true },
   sellerBusinessName: { type: String, required: true },
   brand: { type: String },
-  stock: { type: Number, default: 100 },
+  stock: { type: Number, default: 100, min: 0, validate: Number.isInteger },
   isActive: { type: Boolean, default: true },
   averageRating: { type: Number, default: 0 },
   reviewCount: { type: Number, default: 0 },
@@ -1032,6 +1032,12 @@ app.post('/api/products', async (req, res) => {
       : access.sessionUser.email.toLowerCase();
 
     if (!targetEmail) return res.status(400).json({ error: 'Seller email is required' });
+    if (typeof id !== 'string' || id.trim().length < 2 || id.trim().length > 120 || !Number.isFinite(Number(year)) || Number(year) < 1900 || Number(year) > 2100 || !Number.isFinite(Number(cost)) || Number(cost) < 0 || typeof img !== 'string' || img.length > 2048 || typeof category !== 'string' || category.trim().length < 1 || category.length > 100 || typeof description !== 'string' || description.trim().length < 1 || description.length > 5000) {
+      return res.status(400).json({ error: 'Invalid product fields or values' });
+    }
+    if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0 || Number(stock) > 1000000)) {
+      return res.status(400).json({ error: 'Stock must be a nonnegative whole number' });
+    }
 
     const seller = access.isSuperAdmin
       ? await Seller.findOne({ email: targetEmail }).maxTimeMS(5000)
@@ -1073,6 +1079,11 @@ app.put('/api/products/:id', async (req, res) => {
     if (!access) return;
 
     const { year, cost, img, category, description, brand, stock, isActive, images, variants, specifications, relatedProductIds } = req.body;
+    if (cost !== undefined && (!Number.isFinite(Number(cost)) || Number(cost) < 0)) return res.status(400).json({ error: 'Price must be a nonnegative number' });
+    if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0 || Number(stock) > 1000000)) return res.status(400).json({ error: 'Stock must be a nonnegative whole number' });
+    if (year !== undefined && (!Number.isInteger(Number(year)) || Number(year) < 1900 || Number(year) > 2100)) return res.status(400).json({ error: 'Invalid product year' });
+    if (img !== undefined && (typeof img !== 'string' || img.length > 2048)) return res.status(400).json({ error: 'Invalid product image URL' });
+    if (description !== undefined && (typeof description !== 'string' || description.length > 5000)) return res.status(400).json({ error: 'Product description is too long or invalid' });
     const filter = { id: req.params.id };
     if (access.isSuperAdmin && req.body.sellerEmail) {
       filter.sellerEmail = String(req.body.sellerEmail).toLowerCase();
