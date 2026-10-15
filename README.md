@@ -136,6 +136,8 @@ PORT=5000
 
 For production, use a strong random session secret of at least 32 characters.
 
+Set `SUPER_ADMIN_DELETE_PIN` in the backend environment before using destructive admin actions. Use a unique random value of at least 12 characters (not a short numeric PIN). If it is missing, deletion fails closed.
+
 ### Start backend
 
 ```bash
@@ -162,7 +164,7 @@ Frontend: `http://localhost:5173`
 | `MONGODB_URI` | MongoDB connection string |
 | `AUTH_SESSION_SECRET` | Secret used to sign authentication sessions |
 | `PORT` | Local backend port |
-| `SUPER_ADMIN_DELETE_PIN` | Optional protected-deletion PIN |
+| `SUPER_ADMIN_DELETE_PIN` | Required unique random secret (12+ characters) for super-admin product/order deletion; no insecure default is provided |
 
 **Never commit database credentials, session secrets, or other private credentials to GitHub.**
 
