@@ -17,7 +17,13 @@ const app = () => {
   return new ConfidentialClientApplication({ auth: { clientId, clientSecret, authority: AUTHORITY } });
 };
 
-const key = () => crypto.createHash('sha256').update(process.env.AUTH_SESSION_SECRET || '').digest();
+const key = () => {
+  const secret = process.env.AUTH_SESSION_SECRET;
+  if (typeof secret !== 'string' || secret.length < 32) {
+    throw new Error('AUTH_SESSION_SECRET must be configured with at least 32 characters before Microsoft token storage is enabled');
+  }
+  return crypto.createHash('sha256').update(secret).digest();
+};
 
 const encrypt = (value) => {
   const iv = crypto.randomBytes(12);
