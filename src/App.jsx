@@ -331,6 +331,10 @@ function App() {
         if (response.ok && data.authenticated && data.user) {
           setCurrentUser(data.user);
           setIsAdmin(data.user.isAdmin === true);
+          if (window.location.hash === "#login") {
+            window.location.hash = "#home";
+            setActivePage("home");
+          }
           setCartItems(getCart(data.user.email));
           setWishlistItems(getWishlist(data.user.email));
           sessionStorage.setItem("authUser", JSON.stringify(data.user));
@@ -901,13 +905,7 @@ function App() {
       window.location.hash = "#home";
       setActivePage("home");
 
-      Swal.fire({
-        icon: "success",
-        title: "Welcome!",
-        text: `Successfully signed in as ${userData.name}`,
-        timer: 2000,
-        showConfirmButton: false,
-      });
+      // Sign in silently and return to the home page without a success popup.
     },
     []
   );
