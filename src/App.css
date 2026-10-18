@@ -2520,3 +2520,97 @@ footer,
   .dashboard-legal-actions { gap: 8px; }
   .dashboard-legal-actions button { padding-inline: 9px; font-size: 0.82rem; }
 }
+
+
+/* Reliable mobile filter sheet: keep the panel above the overlay and viewport,
+   with its own scroll area and a tappable trigger. */
+@media (max-width: 768px) {
+  .mobile-filter-toggle {
+    position: relative !important;
+    z-index: 2 !important;
+    display: flex !important;
+    min-height: 46px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .filter-overlay {
+    display: block !important;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    background: rgba(15, 23, 42, .48);
+    z-index: 2990 !important;
+    transition: opacity .2s ease, visibility .2s ease;
+  }
+  .filter-overlay.active {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .products-container .filter-sidebar {
+    position: fixed !important;
+    inset-inline: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    max-width: none !important;
+    height: min(82dvh, 760px) !important;
+    max-height: 82dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    border-radius: 22px 22px 0 0 !important;
+    background: #fff !important;
+    z-index: 3000 !important;
+    box-shadow: 0 -12px 40px rgba(15, 23, 42, .22) !important;
+    transform: translateY(calc(100% + 24px)) !important;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform .25s ease, visibility .25s ease !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+  .products-container .filter-sidebar.mobile-open {
+    transform: translateY(0) !important;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .products-container .filter-sidebar .filter-content-scroll {
+    min-height: 0;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 18px 24px !important;
+  }
+  .products-container .filter-sidebar .filter-modal-header {
+    position: relative !important;
+    top: auto !important;
+    flex: 0 0 auto !important;
+  }
+  .products-container .filter-sidebar .filter-modal-footer {
+    position: relative !important;
+    bottom: auto !important;
+    flex: 0 0 auto !important;
+    padding-bottom: calc(13px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  body:has(.filter-sidebar.mobile-open) {
+    overflow: hidden;
+    touch-action: none;
+  }
+  .filter-sidebar.mobile-open,
+  .filter-sidebar.mobile-open * {
+    touch-action: pan-y;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .filter-overlay,
+  .products-container .filter-sidebar {
+    transition: none !important;
+  }
+}
