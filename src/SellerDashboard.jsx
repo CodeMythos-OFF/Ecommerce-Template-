@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getOrders, getStats, updateProduct } from "./api";
+import { getOrders, getStats, updateProduct, updateOrderStatus } from "./api";
 import "./SellerDashboard.css";
 
 const API_URL = window.location.hostname === "localhost" ? "http://localhost:5000/api" : "/api";
