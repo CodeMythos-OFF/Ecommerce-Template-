@@ -9,7 +9,8 @@ export const getCart = (userEmail) => {
   
   try {
     const cartKey = `cart_${userEmail}`;
-    const savedCart = sessionStorage.getItem(cartKey);
+    // Keep carts across browser restarts while retaining the sessionStorage fallback.
+    const savedCart = localStorage.getItem(cartKey) || sessionStorage.getItem(cartKey);
     return savedCart ? JSON.parse(savedCart) : [];
   } catch (error) {
     console.error('Error loading cart:', error);
@@ -23,7 +24,9 @@ export const saveCart = (userEmail, cartItems) => {
   
   try {
     const cartKey = `cart_${userEmail}`;
-    sessionStorage.setItem(cartKey, JSON.stringify(cartItems));
+    const serialized = JSON.stringify(cartItems);
+    localStorage.setItem(cartKey, serialized);
+    sessionStorage.setItem(cartKey, serialized);
   } catch (error) {
     console.error('Error saving cart:', error);
   }
@@ -57,6 +60,7 @@ export const clearCart = (userEmail) => {
   
   try {
     const cartKey = `cart_${userEmail}`;
+    localStorage.removeItem(cartKey);
     sessionStorage.removeItem(cartKey);
   } catch (error) {
     console.error('Error clearing cart:', error);
