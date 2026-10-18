@@ -26,6 +26,11 @@ export default function CustomerAccount({ currentUser, onPageChange }) {
     setAddresses(getAddresses(currentUser?.email));
   }, [currentUser?.email]);
 
+  useEffect(() => {
+    if (!currentUser?.email) { setTickets([]); return; }
+    supportRequest("/support/tickets?limit=50").then(setTickets).catch(() => setTickets([]));
+  }, [currentUser?.email]);
+
   const save = (event) => {
     event.preventDefault();
     if (!currentUser) return;
