@@ -92,6 +92,7 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
           <li className={activePage === 'home' ? 'active-nav-link' : ''}><a href="#home" onClick={go('home')}>Home</a></li>
           <li className={activePage === 'p' ? 'active-nav-link' : ''}><a href="#p" onClick={go('p')}>Products</a></li>
           {currentUser && !currentUser.isSeller && !currentUser.isSuperAdmin && <li className={activePage === 'sellerapply' ? 'active-nav-link' : ''}><a href="#sellerapply" onClick={go('sellerapply')}>Sell</a></li>}
+          {currentUser && (currentUser.isSeller || currentUser.isSuperAdmin) && <li className={activePage === 'sellerdashboard' ? 'active-nav-link' : ''}><a href="#sellerdashboard" onClick={go('sellerdashboard')}>Seller Dashboard</a></li>}
           {currentUser && <li className={activePage === 'dashboard' ? 'active-nav-link' : ''}><a href="#dashboard" onClick={go('dashboard')}>Dashboard</a></li>}
           <li className={activePage === 'Cart' ? 'active-nav-link' : ''}><a href="#Cart" onClick={go('Cart')} className="position-relative">Cart ({cartCount})</a></li>
           {hasAdminAccess && <li className={activePage === 'admin' ? 'active-nav-link' : ''}><a href="#admin" onClick={go('admin')}><i className="bi bi-shield-lock me-1"></i> Admin Panel</a></li>}
@@ -116,6 +117,7 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
           <button className={`nav-item ${activePage === 'p' ? 'active' : ''}`} onClick={go('p')} aria-label="Products"><span className="nav-icon">{NAV_ICONS.products}</span><span className="nav-label">Shop</span></button>
           <button className={`nav-item ${activePage === 'Cart' ? 'active' : ''}`} onClick={go('Cart')} aria-label="Cart"><span className="nav-icon">{NAV_ICONS.cart}</span><span className="nav-label">Cart</span>{cartCount > 0 && <span className="cart-badge">{cartCount}</span>}</button>
           {currentUser && <button className={`nav-item ${activePage === 'wishlist' ? 'active' : ''}`} onClick={go('wishlist')} aria-label="Wishlist"><span className="nav-icon">❤️</span><span className="nav-label">Wishlist</span></button>}
+          {currentUser && (currentUser.isSeller || currentUser.isSuperAdmin) && <button className={`nav-item ${activePage === 'sellerdashboard' ? 'active' : ''}`} onClick={go('sellerdashboard')} aria-label="Seller Dashboard"><span className="nav-icon">🏪</span><span className="nav-label">Seller</span></button>}
           {hasAdminAccess && <button className={`nav-item ${activePage === 'admin' ? 'active' : ''}`} onClick={go('admin')} aria-label="Admin Panel"><span className="nav-icon">🛡️</span><span className="nav-label">Admin</span></button>}
           {!currentUser ? (
             <button className={`nav-item ${activePage === 'login' ? 'active' : ''}`} onClick={go('login')} aria-label="Login"><span className="nav-icon">{NAV_ICONS.login}</span><span className="nav-label">Login</span></button>
