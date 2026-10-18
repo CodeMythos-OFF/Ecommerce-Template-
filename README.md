@@ -12,6 +12,17 @@ ShopMaster is a responsive e-commerce application with a product catalog, user a
 
 ## ✨ Features
 
+### 🤖 AI Shopping Assistant
+- Catalog-aware shopping help powered by OpenRouter or Groq
+- Provider API keys remain on the backend
+- Rate-limited assistant endpoint with bounded input and response sizes
+- Product suggestions are grounded in the catalog provided by the storefront
+
+### 📱 Progressive Web App
+- Web app manifest and installable app metadata
+- Small offline app-shell cache for navigation fallback
+- API requests are never cached by the service worker
+
 ### 🛍️ Customer Shopping
 - Product search and category filtering
 - Detailed product pages
@@ -164,7 +175,7 @@ Frontend: `http://localhost:5173`
 | `MONGODB_URI` | MongoDB connection string |
 | `AUTH_SESSION_SECRET` | Secret used to sign authentication sessions |
 | `PORT` | Local backend port |
-| `SUPER_ADMIN_DELETE_PIN` | Required unique random secret (12+ characters) for super-admin product/order deletion; no insecure default is provided |
+| `SUPER_ADMIN_DELETE_PIN` | Required unique random secret (12+ characters) for super-admin product/order deletion; no insecure default is provided |\n| `OPENROUTER_API_KEY` | Optional server-side key for the AI shopping assistant (preferred if configured) |\n| `OPENROUTER_MODEL` | Optional OpenRouter model; defaults to `openrouter/auto` |\n| `GROQ_API_KEY` | Optional server-side Groq key used when OpenRouter is not configured |\n| `GROQ_MODEL` | Optional Groq model; defaults to `llama-3.3-70b-versatile` |
 
 **Never commit database credentials, session secrets, or other private credentials to GitHub.**
 
@@ -251,15 +262,15 @@ See **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** for deployment information.
 
 ## 🗺️ Roadmap
 
-- [ ] Payment gateway integration
-- [ ] User order history
-- [ ] Product reviews and ratings
-- [ ] Wishlist
+- [ ] Payment gateway integration (intentionally excluded; checkout remains COD-only)
+- [x] User order history
+- [x] Product reviews and ratings
+- [x] Wishlist
 - [ ] Seller analytics
 - [ ] Inventory alerts
-- [ ] Advanced product specifications
+- [x] Advanced product specifications
 - [ ] Order tracking
-- [ ] Seller storefronts
+- [x] Seller storefronts
 - [ ] Notifications
 
 ## 🤝 Contributing
