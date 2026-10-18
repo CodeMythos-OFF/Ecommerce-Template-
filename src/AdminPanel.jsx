@@ -22,6 +22,7 @@ import {
   deleteCoupon,
 } from './api';
 import './AdminPanel.css';
+import Phase4Admin from './Phase4Admin';
 import Swal from 'sweetalert2';
 
 const AdminPanel = ({ currentUser }) => {
@@ -666,6 +667,9 @@ const AdminPanel = ({ currentUser }) => {
               <button className={`admin-nav-item ${activeTab === 'emails' ? 'active' : ''}`} onClick={() => setActiveTab('emails')}>
                 <i className="bi bi-envelope-paper"></i><span>Email automation</span>
               </button>
+              <button className={`admin-nav-item ${activeTab === 'phase4' ? 'active' : ''}`} onClick={() => setActiveTab('phase4')}>
+                <i className="bi bi-graph-up-arrow"></i><span>Analytics & Support</span>
+              </button>
             </div>
           )}
 
@@ -683,7 +687,7 @@ const AdminPanel = ({ currentUser }) => {
               ['dashboard', 'Overview', 'speedometer2'],
               ['orders', 'Orders', 'bag-check'],
               ['products', 'Products', 'box-seam'],
-              ...(currentUser?.isSuperAdmin ? [['sellers', 'Sellers', 'people'], ['coupons', 'Coupons', 'ticket-perforated'], ['emails', 'Emails', 'envelope-paper']] : [])
+              ...(currentUser?.isSuperAdmin ? [['sellers', 'Sellers', 'people'], ['coupons', 'Coupons', 'ticket-perforated'], ['emails', 'Emails', 'envelope-paper'], ['phase4', 'Phase 4', 'graph-up-arrow']] : [])
             ].map(([key, label, icon]) => (
               <button key={key} className={activeTab === key ? 'active' : ''} onClick={() => setActiveTab(key)}>
                 <i className={`bi bi-${icon}`}></i>{label}
@@ -691,6 +695,7 @@ const AdminPanel = ({ currentUser }) => {
             ))}
           </div>
 
+      {activeTab === 'phase4' && currentUser?.isSuperAdmin && <Phase4Admin currentUser={currentUser} />}
 
       {activeTab === 'coupons' && currentUser?.isSuperAdmin && (
         <div className="row g-4">
