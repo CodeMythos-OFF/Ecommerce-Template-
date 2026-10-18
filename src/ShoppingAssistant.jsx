@@ -49,14 +49,18 @@ export default function ShoppingAssistant({ products = [], currentUser = null, o
         return true;
       }
     }
-    const addIntent = hasAny(query, ["add ", "put ", "include ", "buy ", "get "]) && hasAny(query, ["cart", "basket", "buy", "get", "add", "put", "include"]);
+    const addIntent = hasAny(query, [
+      "add ", "put ", "include ", "add to cart", "put in my cart",
+      "add in cart", "add into cart", "buy ", "get me ", "i want "
+    ]) && hasAny(query, ["cart", "basket", "buy", "get", "add", "put", "include", "want"]);
     const checkoutIntent = hasAny(query, ["checkout", "place order", "place an order", "buy now", "order these", "order now", "complete my order", "proceed to order", "go to cart"]);
 
     if (addIntent) {
-      const terms = query.split(" ").filter((word) => word.length > 2 && !["add", "please", "into", "cart", "basket", "put", "include", "buy", "get", "the", "for", "me", "one", "item", "product", "to"].includes(word));
+      const stopWords = new Set(["add", "please", "into", "cart", "basket", "put", "include", "buy", "get", "the", "for", "me", "one", "two", "three", "item", "items", "product", "products", "to", "my", "in", "want", "i", "a", "an", "and", "of", "with", "can", "you", "could", "would"]);
+      const terms = query.split(" ").filter((word) => word.length > 2 && !stopWords.has(word));
       const ranked = products.map((product) => {
         const id = normalize(product.id);
-        const searchable = normalize([product.id, product.brand, product.sellerBusinessName, product.category, product.description].join(" "));
+        const searchable = normalize([product.id, product.brand, product.sellerBusinessName, product.sellerName, product.category, product.description].join(" "));
         const score = terms.reduce((total, term) => total + (searchable.includes(term) ? (id.includes(term) ? 4 : 1) : 0), 0);
         return { product, score, idMatch: terms.some((term) => id.includes(term)) };
       }).sort((a, b) => b.score - a.score);
