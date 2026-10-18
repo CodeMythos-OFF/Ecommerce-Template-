@@ -8,6 +8,8 @@ import ProductReviews from "./ProductReviews";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsOfService from "./TermsOfService";
 import SellerApplication from "./SellerApplication";
+import SellerDashboard from "./SellerDashboard";
+import SellerStorefront from "./SellerStorefront";
 import Wishlist from "./Wishlist";
 import CustomerAccount from "./CustomerAccount";
 import { getWishlist, toggleWishlist } from "./wishlistService";
@@ -34,6 +36,8 @@ const ROUTES = {
   "#privacy": "privacy",
   "#terms": "terms",
   "#sellerapply": "sellerapply",
+  "#sellerdashboard": "sellerdashboard",
+  "#storefront": "storefront",
   "#wishlist": "wishlist",
 };
 
@@ -289,6 +293,7 @@ function App() {
   const [sortBy, setSortBy] = useState("featured");
   const [inStockOnly, setInStockOnly] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedStoreEmail, setSelectedStoreEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const hasAdminAccess = isAdmin || currentUser?.isAdmin === true || currentUser?.isSuperAdmin === true || currentUser?.email?.toLowerCase() === "codemythos@outlook.com";
@@ -1415,6 +1420,7 @@ function App() {
                       <p>{product.sellerName || "Seller name not provided"}</p>
                     </div>
                   </div>
+                  <button type="button" className="btn btn-outline-primary btn-sm mt-3" onClick={() => { setSelectedStoreEmail(product.sellerEmail || ""); handlePageChange("storefront"); }} disabled={!product.sellerEmail}>Visit seller storefront <i className="bi bi-arrow-up-right ms-1"></i></button>
                   <div className="seller-facts">
                     <span><i className="bi bi-person-badge"></i> Seller ID: {product.sellerId || product.sellerEmail || "Not available"}</span>
                     <span><i className="bi bi-envelope"></i> {product.sellerEmail || "Email not available"}</span>
@@ -1684,6 +1690,11 @@ function App() {
                     </div>
                   </div>
                 </div>
+                {currentUser && (currentUser.isSeller || currentUser.isSuperAdmin) && (
+                  <div className="col-md-6" onClick={() => handlePageChange("sellerdashboard")} style={{ cursor: "pointer" }}>
+                    <div className="card shadow-sm border-0 h-100 action-card hover-lift"><div className="card-body d-flex align-items-center p-4"><div className="icon-box bg-primary-soft text-primary me-3"><i className="bi bi-speedometer2" style={{ fontSize: "1.7rem" }}></i></div><div><h6 className="fw-bold mb-1">Seller Dashboard</h6><p className="text-muted small mb-0">Manage inventory, orders and store performance</p></div></div></div>
+                  </div>
+                )}
                 {currentUser && !currentUser.isSeller && !currentUser.isSuperAdmin && (
                   <div className="col-md-6" onClick={() => handlePageChange("sellerapply")} style={{ cursor: "pointer" }}>
                     <div className="card shadow-sm border-0 h-100 action-card hover-lift">
@@ -1725,6 +1736,10 @@ function App() {
       <div id="wishlist" className={`page ${activePage === "wishlist" ? "active" : ""}`}>
         <Wishlist currentUser={currentUser} products={products} onShowDetails={showProductDetails} onAddCart={handleAddToCart} />
       </div>
+
+      <div id="sellerdashboard" className={`page ${activePage === "sellerdashboard" ? "active" : ""}`}><SellerDashboard currentUser={currentUser} /></div>
+
+      <div id="storefront" className={`page ${activePage === "storefront" ? "active" : ""}`}><SellerStorefront email={selectedStoreEmail} onShowDetails={showProductDetails} /></div>
 
       <div id="sellerapply" className={`page ${activePage === "sellerapply" ? "active" : ""}`}>
         <SellerApplication currentUser={currentUser} />
