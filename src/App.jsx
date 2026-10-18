@@ -611,7 +611,7 @@ function App() {
         position: "top-end",
       });
     },
-    [currentUser, cartItems, handlePageChange]
+    [currentUser, products, cartItems, handlePageChange]
   );
 
   const handleToggleWishlist = useCallback(
