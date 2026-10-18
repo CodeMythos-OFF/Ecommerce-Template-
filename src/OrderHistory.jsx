@@ -66,8 +66,9 @@ const OrderHistory = ({ currentUser }) => {
 
   const handleReorder = async (order) => {
     if (!currentUser?.email) return;
-    const purchased = (order.cart || []).flatMap((item) => {
-      const productInfo = (order.products || []).find((product) => product.name === item.id);
+    const purchased = (order.cart || []).flatMap((item, itemIndex) => {
+      // The order stores cart display rows in the same order as its trusted product rows.
+      const productInfo = (order.products || [])[itemIndex] || (order.products || []).find((product) => product.name === item.id);
       const quantity = Math.max(1, Number(item.quantity) || 1);
       return Array.from({ length: quantity }, () => ({
         ...item,
