@@ -2,12 +2,25 @@ import React, { useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import { addAddress, deleteAddress, getAddresses } from "./addressService";
 
+const API_URL = window.location.hostname === "localhost" ? "http://localhost:5000/api" : "/api";
+const supportRequest = async (path, options = {}) => {
+  const token = localStorage.getItem("shopmaster_session_token");
+  const response = await fetch(`${API_URL}${path}`, { credentials: "include", ...options, headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Support request failed");
+  return data;
+};
+
 const emptyAddress = { label: "Home", name: "", phone: "", street: "", city: "", state: "", pincode: "", country: "India", digipin: "" };
 
 export default function CustomerAccount({ currentUser, onPageChange }) {
   const [addresses, setAddresses] = useState([]);
   const [form, setForm] = useState(emptyAddress);
   const [editingId, setEditingId] = useState(null);
+  const [tickets, setTickets] = useState([]);
+  const [ticketForm, setTicketForm] = useState({ subject: "", category: "Other", message: "" });
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [ticketError, setTicketError] = useState("");
 
   useEffect(() => {
     setAddresses(getAddresses(currentUser?.email));
@@ -41,6 +54,22 @@ export default function CustomerAccount({ currentUser, onPageChange }) {
     if (!result.isConfirmed) return;
     deleteAddress(currentUser.email, id);
     setAddresses(getAddresses(currentUser.email));
+  };
+
+  const submitTicket = async (event) => {
+    event.preventDefault();
+    setTicketLoading(true); setTicketError("");
+    try {
+      const ticket = await supportRequest("/support/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ticketForm)
+      });
+      setTickets(items => [ticket, ...items]);
+      setTicketForm({ subject: "", category: "Other", message: "" });
+      Swal.fire({ icon: "success", title: "Support ticket created", text: `Ticket ${ticket.ticketNumber} has been submitted.`, timer: 1800, showConfirmButton: false });
+    } catch (error) { setTicketError(error.message); }
+    finally { setTicketLoading(false); }
   };
 
   if (!currentUser) return null;
@@ -115,6 +144,28 @@ export default function CustomerAccount({ currentUser, onPageChange }) {
           </section>
         </div>
       </div>
+
+      <section className="account-panel mt-4">
+        <div className="section-kicker">Help center</div>
+        <h2>Contact support</h2>
+        <p className="text-muted">Create a ticket and follow its status from your account.</p>
+        {ticketError && <div className="alert alert-danger">{ticketError}</div>}
+        <form className="account-form mb-4" onSubmit={submitTicket}>
+          <div className="row g-2">
+            <div className="col-md-7"><label>Subject *</label><input minLength="4" maxLength="160" required value={ticketForm.subject} onChange={e => setTicketForm({ ...ticketForm, subject: e.target.value })} /></div>
+            <div className="col-md-5"><label>Category</label><select value={ticketForm.category} onChange={e => setTicketForm({ ...ticketForm, category: e.target.value })}><option>Order</option><option>Product</option><option>Seller</option><option>Account</option><option>Other</option></select></div>
+            <div className="col-12"><label>How can we help? *</label><textarea required minLength="10" maxLength="5000" rows="4" value={ticketForm.message} onChange={e => setTicketForm({ ...ticketForm, message: e.target.value })} /></div>
+          </div>
+          <button className="btn btn-primary mt-3" type="submit" disabled={ticketLoading}>{ticketLoading ? "Submitting…" : "Submit support ticket"}</button>
+        </form>
+        <h3 className="h5">Your tickets</h3>
+        {tickets.length === 0 ? <p className="text-muted mb-0">No support tickets yet.</p> : tickets.map(ticket => (
+          <div className="saved-address-card" key={ticket._id}>
+            <div><span className="address-label">{ticket.ticketNumber} · {ticket.status}</span><strong>{ticket.subject}</strong><p>{ticket.message}</p>{ticket.response && <small><strong>Support response:</strong> {ticket.response}</small>}</div>
+            <small>{new Date(ticket.updatedAt || ticket.createdAt).toLocaleDateString()}</small>
+          </div>
+        ))}
+      </section>
 
       <section className="account-panel mt-4">
         <div className="section-kicker">Account</div>
