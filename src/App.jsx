@@ -582,22 +582,20 @@ function App() {
           text: "You need to sign in to add items to your cart",
           confirmButtonText: "Sign In",
         }).then((result) => {
-          if (result.isConfirmed) {
-            handlePageChange("login");
-          }
+          if (result.isConfirmed) handlePageChange("login");
         });
-        return;
+        return false;
       }
       const liveProduct = products.find((item) => String(item.id) === String(product.id)) || product;
       const stock = Number(liveProduct.stock ?? 0);
       const currentQuantity = cartItems.filter((item) => String(item.id) === String(product.id)).length;
       if (stock <= 0) {
         Swal.fire({ icon: "warning", title: "Out of stock", text: "This product is currently unavailable." });
-        return;
+        return false;
       }
       if (currentQuantity >= stock) {
         Swal.fire({ icon: "info", title: "Stock limit reached", text: `Only ${stock} item${stock === 1 ? "" : "s"} available.` });
-        return;
+        return false;
       }
       const updatedCart = addToCart(currentUser.email, liveProduct, cartItems);
       setCartItems(updatedCart);
@@ -610,6 +608,7 @@ function App() {
         toast: true,
         position: "top-end",
       });
+      return true;
     },
     [currentUser, products, cartItems, handlePageChange]
   );
@@ -1806,7 +1805,7 @@ function App() {
         )}
       </div>
 
-      <ShoppingAssistant products={products} onShowDetails={showProductDetails} onAddToCart={handleAddToCart} onGoToCart={() => handlePageChange("Cart")} />
+      <ShoppingAssistant products={products} currentUser={currentUser} onShowDetails={showProductDetails} onAddToCart={handleAddToCart} onGoToCart={() => handlePageChange("Cart")} onNavigate={handlePageChange} />
     </>
   );
 }
