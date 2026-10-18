@@ -15,7 +15,7 @@ export default function SellerStorefront({ email, onShowDetails }) {
       setLoading(true);
       setError("");
       try {
-        const response = await fetch(`${API_URL}/storefront/${encodeURIComponent(email || "")}`);
+        const response = await fetch(`${API_URL}/storefront?email=${encodeURIComponent(String(email || "").trim())}`);
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Could not load this store");
         if (!cancelled) {
