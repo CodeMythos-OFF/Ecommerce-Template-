@@ -15,7 +15,7 @@ export default function ShoppingAssistant({ products = [], onShowDetails, onAddT
   const runLocalAction = (content) => {
     const query = normalize(content);
     const addIntent = hasAny(query, ["add ", "put ", "include ", "buy ", "get "]) && hasAny(query, ["cart", "basket", "buy", "get", "add", "put", "include"]);
-    const checkoutIntent = hasAny(query, ["checkout", "place order", "buy now", "order these", "proceed to order", "go to cart"]);
+    const checkoutIntent = hasAny(query, ["checkout", "place order", "place an order", "buy now", "order these", "order now", "complete my order", "proceed to order", "go to cart"]);
 
     if (addIntent) {
       const terms = query.split(" ").filter((word) => word.length > 2 && !["add", "please", "into", "cart", "basket", "put", "include", "buy", "get", "the", "for", "me", "one", "item", "product", "to"].includes(word));
