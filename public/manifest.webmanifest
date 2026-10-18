@@ -1,0 +1,14 @@
+{
+  "name": "ShopMaster",
+  "short_name": "ShopMaster",
+  "description": "Shop products from trusted sellers with ShopMaster.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d233d",
+  "theme_color": "#0d233d",
+  "icons": [
+    { "src": "/Logo_Light.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/Logo_Light.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
