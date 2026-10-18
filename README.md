@@ -266,12 +266,12 @@ See **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** for deployment information.
 - [x] User order history
 - [x] Product reviews and ratings
 - [x] Wishlist
-- [ ] Seller analytics
-- [ ] Inventory alerts
+- [x] Seller analytics (7-day sales chart, product performance, revenue and units sold)
+- [x] Inventory alerts (low-stock warnings and per-product stock publishing controls)
 - [x] Advanced product specifications
-- [ ] Order tracking
+- [x] Seller order management and status updates (order history provides the current tracking status)
 - [x] Seller storefronts
-- [ ] Notifications
+- [x] Order-status email notifications when Microsoft email is connected
 
 ## 🤝 Contributing
 
