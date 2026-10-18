@@ -1009,6 +1009,7 @@ app.put('/api/sellers/:email/approve', async (req, res) => {
       await seller.save();
     }
     sendTemplateEmail('seller_approved', seller.email, seller);
+    await recordAuditLog(req, 'seller.approved', 'seller', seller.email, { businessName: seller.businessName });
 
     res.json({ success: true, seller, message: 'Seller approved successfully' });
   } catch (error) {
@@ -1039,6 +1040,7 @@ app.put('/api/sellers/:email/revoke', async (req, res) => {
       return res.status(404).json({ error: 'Seller not found' });
     }
     sendTemplateEmail('seller_revoked', seller.email, seller);
+    await recordAuditLog(req, 'seller.access_revoked', 'seller', seller.email, { businessName: seller.businessName });
 
     res.json({ success: true, seller, message: 'Seller access revoked' });
   } catch (error) {
@@ -1209,6 +1211,7 @@ app.delete('/api/products/:id', async (req, res) => {
 
     const product = await Product.findOneAndDelete(filter).maxTimeMS(5000);
     if (!product) return res.status(404).json({ error: 'Product not found' });
+    await recordAuditLog(req, 'product.deleted', 'product', product.id, { sellerEmail: product.sellerEmail, price: product.cost });
 
     res.json({ message: 'Product deleted successfully', product });
   } catch (error) {
