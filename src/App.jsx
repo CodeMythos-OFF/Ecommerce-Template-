@@ -1666,7 +1666,7 @@ function App() {
                       </div>
                       <div>
                         <h6 className="fw-bold mb-1">Your Orders</h6>
-                        <p className="text-muted small mb-0">Track, return, or buy again</p>
+                        <p className="text-muted small mb-0">Track orders or buy again</p>
                       </div>
                     </div>
                   </div>
