@@ -470,7 +470,8 @@ function App() {
       }
       setActivePage(pageId);
       window.location.hash = `#${pageId}`;
-      if (pageId !== "pdetails") {
+      // Keep the selected product while navigating to its reviews page.
+      if (pageId !== "pdetails" && pageId !== "reviews") {
         setSelectedProduct(null);
       }
     },
@@ -1463,6 +1464,19 @@ function App() {
             </div>
           );
         })()}
+      </div>
+
+      <div id="reviews" className={`page ${activePage === "reviews" ? "active" : ""}`}>
+        {selectedProduct ? (
+          <ProductReviews product={selectedProduct} currentUser={currentUser} />
+        ) : (
+          <div className="container py-5">
+            <div className="alert alert-info">
+              Select a product first to read or write its reviews.
+              <button type="button" className="btn btn-link" onClick={() => handlePageChange("p")}>Browse products</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div id="home" className={`page ${activePage === "home" ? "active" : ""}`}>
