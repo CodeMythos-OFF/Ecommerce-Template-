@@ -932,7 +932,7 @@ app.post('/api/sellers/register', async (req, res) => {
 app.get('/api/storefront/:email', async (req, res) => {
   try {
     const email = String(req.params.email || '').trim().toLowerCase();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: 'Invalid seller email' });
     }
     const seller = await Seller.findOne({ email, isApproved: true }).select('email name businessName createdAt').lean().maxTimeMS(5000);
