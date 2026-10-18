@@ -58,21 +58,24 @@ export default function SellerDashboard({ currentUser }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const sellerItems = useMemo(() => orders.flatMap(order => (order.products || [])
-    .filter(item => String(item.sellerEmail || "").toLowerCase() === String(currentUser?.email || "").toLowerCase())
-    .map(item => ({ ...item, orderId: order.trackingId || order._id, orderStatus: order.status || "Order Placed", orderDate: order.createdAt, customer: order.userName || "Customer", customerEmail: order.user || "" }))), [orders, currentUser?.email]);
+  // Cancelled orders must not inflate sales, earnings, product performance, or customer spend.
+  const sellerItems = useMemo(() => orders
+    .filter(order => String(order.status || "Order Placed").toLowerCase() !== "cancelled")
+    .flatMap(order => (order.products || [])
+      .filter(item => String(item.sellerEmail || "").toLowerCase() === String(currentUser?.email || "").toLowerCase())
+      .map(item => ({ ...item, orderId: order.trackingId || order._id, orderStatus: order.status || "Order Placed", orderDate: order.createdAt, customer: order.userName || "Customer", customerEmail: order.user || "" }))), [orders, currentUser?.email]);
   const filteredProducts = useMemo(() => products.filter(p => (p.id + " " + p.category + " " + (p.brand || "")).toLowerCase().includes(search.toLowerCase())), [products, search]);
   const filteredOrders = useMemo(() => orders.filter(o => {
     const mine = (o.products || []).some(p => String(p.sellerEmail || "").toLowerCase() === String(currentUser?.email || "").toLowerCase());
     return mine && (orderFilter === "All" || (o.status || "Order Placed") === orderFilter) &&
       (String(o.trackingId || "") + " " + String(o.userName || "") + " " + String(o.user || "")).toLowerCase().includes(search.toLowerCase());
   }), [orders, orderFilter, search, currentUser?.email]);
-  const revenue = Number(stats.totalRevenue || sellerItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0));
+  const revenue = sellerItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
   const unitsSold = sellerItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   const lowStock = products.filter(p => Number(p.stock || 0) <= 5 && p.isActive !== false);
   const customers = useMemo(() => {
     const map = new Map();
-    orders.forEach(o => {
+    orders.filter(o => String(o.status || "Order Placed").toLowerCase() !== "cancelled").forEach(o => {
       const mine = (o.products || []).filter(p => String(p.sellerEmail || "").toLowerCase() === String(currentUser?.email || "").toLowerCase());
       if (mine.length && o.user) {
         const c = map.get(o.user) || { email: o.user, name: o.userName || "Customer", orders: 0, spent: 0, lastOrder: o.createdAt };
