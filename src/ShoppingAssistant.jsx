@@ -5,7 +5,7 @@ const API_URL = window.location.hostname === "localhost" ? "http://localhost:500
 const normalize = (value = "") => String(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const hasAny = (text, phrases) => phrases.some((phrase) => text.includes(phrase));
 
-export default function ShoppingAssistant({ products = [], onShowDetails, onAddToCart, onGoToCart }) {
+export default function ShoppingAssistant({ products = [], currentUser = null, onShowDetails, onAddToCart, onGoToCart, onNavigate }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([{ role: "assistant", content: "Hi! Tell me what you're shopping for, your budget, or the features you need. I can suggest products from the current ShopMaster catalog, add a clearly identified product to your cart, and take you to checkout to review your order." }]);
@@ -33,8 +33,12 @@ export default function ShoppingAssistant({ products = [], onShowDetails, onAddT
           return true;
         }
         if (typeof onAddToCart === "function") {
-          onAddToCart(best.product);
-          setMessages((current) => [...current, { role: "assistant", content: `I sent “${best.product.id}” to your cart action. Check the cart to confirm it was added. You can ask me to open the cart or checkout next.` }]);
+          if (!currentUser) {
+            setMessages((current) => [...current, { role: "assistant", content: `I couldn't add “${best.product.id}” because you're signed out. Please sign in, then ask me to add it again. Nothing was added to your cart.` }]);
+            return true;
+          }
+          const added = onAddToCart(best.product);
+          setMessages((current) => [...current, { role: "assistant", content: added === true ? `Added “${best.product.id}” to your cart.` : `I couldn't confirm that “${best.product.id}” was added. Please check your cart before relying on it.` }]);
           return true;
         }
       }
