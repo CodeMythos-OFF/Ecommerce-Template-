@@ -1491,6 +1491,26 @@ function App() {
               </div>
             ) : (
               <div className="pb-5">
+                {products.some((product) => Number(product.stock ?? 0) > 0) && (
+                  <ProductSlider
+                    title={currentUser ? "Recommended for you" : "Popular picks"}
+                    products={[...products]
+                      .filter((product) => Number(product.stock ?? 0) > 0)
+                      .sort((a, b) => {
+                        const aScore = (Number(a.averageRating) || 0) * 2 + Math.min(Number(a.reviewCount) || 0, 20) / 10 + (wishlistItems.some((item) => item.id === a.id) ? 2 : 0) + (cartItems.some((item) => item.id === a.id) ? 1 : 0);
+                        const bScore = (Number(b.averageRating) || 0) * 2 + Math.min(Number(b.reviewCount) || 0, 20) / 10 + (wishlistItems.some((item) => item.id === b.id) ? 2 : 0) + (cartItems.some((item) => item.id === b.id) ? 1 : 0);
+                        return bScore - aScore;
+                      })
+                      .slice(0, 8)}
+                    cartItems={cartItems}
+                    onShowDetails={showProductDetails}
+                    onAddCart={handleAddToCart}
+                    onRemoveCart={handleRemoveFromCart}
+                    isWishlisted={isWishlisted}
+                    onToggleWishlist={handleToggleWishlist}
+                    onViewAll={() => handlePageChange("p")}
+                  />
+                )}
                 {sectionCategories.map((cat) => {
                   const catProducts = getProductsForCategory(cat);
                   if (catProducts.length === 0) return null;
