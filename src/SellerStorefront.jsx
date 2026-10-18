@@ -19,7 +19,7 @@ export default function SellerStorefront({ email, onShowDetails }) {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Could not load this store");
         if (!cancelled) {
-          setStore(data.seller);
+          setStore({ ...data.seller, averageRating: data.averageRating, reviewCount: data.reviewCount });
           setProducts(Array.isArray(data.products) ? data.products : []);
         }
       } catch (e) {
