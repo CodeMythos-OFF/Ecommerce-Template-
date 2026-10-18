@@ -293,6 +293,7 @@ function App() {
   const [tempMaxPrice, setTempMaxPrice] = useState("");
   const [sortBy, setSortBy] = useState("featured");
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [discountOnly, setDiscountOnly] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedStoreEmail, setSelectedStoreEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -506,6 +507,7 @@ function App() {
     setSearch("");
     setSortBy("featured");
     setInStockOnly(false);
+    setDiscountOnly(false);
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -524,7 +526,9 @@ function App() {
       const max = maxPrice === "" ? Infinity : parseFloat(maxPrice);
       const matchesPrice = product.cost >= min && product.cost <= max;
       const matchesStock = !inStockOnly || Number(product.stock ?? 0) > 0;
-      return matchesSearch && matchesCategory && matchesBrand && matchesPrice && matchesRating && matchesStock;
+      const mrp = Number(product.mrp) || 0;
+      const matchesDiscount = !discountOnly || (mrp > Number(product.cost || 0) && mrp > 0);
+      return matchesSearch && matchesCategory && matchesBrand && matchesPrice && matchesRating && matchesStock && matchesDiscount;
     });
 
     switch (sortBy) {
@@ -542,6 +546,19 @@ function App() {
           (a, b) => (b.averageRating || b.rating || 0) - (a.averageRating || a.rating || 0)
         );
         break;
+      case "discount":
+        filtered.sort((a, b) => {
+          const da = Number(a.mrp) > Number(a.cost) ? (Number(a.mrp) - Number(a.cost)) / Number(a.mrp) : 0;
+          const db = Number(b.mrp) > Number(b.cost) ? (Number(b.mrp) - Number(b.cost)) / Number(b.mrp) : 0;
+          return db - da;
+        });
+        break;
+      case "name-asc":
+        filtered.sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")));
+        break;
+      case "stock":
+        filtered.sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0));
+        break;
       default:
         break;
     }
@@ -556,6 +573,7 @@ function App() {
     maxPrice,
     sortBy,
     inStockOnly,
+    discountOnly,
   ]);
 
   const showProductDetails = useCallback(
@@ -1002,6 +1020,7 @@ function App() {
     minPrice !== "" ||
     maxPrice !== "" ||
     inStockOnly ||
+    discountOnly ||
     search !== "";
 
   return (
@@ -1132,6 +1151,19 @@ function App() {
                 )}
               </div>
               <div className="filter-section">
+                <h3 className="filter-section-title">Availability & Deals</h3>
+                <label className="filter-toggle-card" htmlFor="filter-in-stock">
+                  <span className="filter-toggle-icon"><i className="bi bi-box-seam"></i></span>
+                  <span className="filter-toggle-copy"><strong>In stock</strong><small>Only show items available now</small></span>
+                  <input id="filter-in-stock" type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} />
+                </label>
+                <label className="filter-toggle-card" htmlFor="filter-discount">
+                  <span className="filter-toggle-icon deal"><i className="bi bi-percent"></i></span>
+                  <span className="filter-toggle-copy"><strong>On sale</strong><small>Products with a listed MRP discount</small></span>
+                  <input id="filter-discount" type="checkbox" checked={discountOnly} onChange={(e) => setDiscountOnly(e.target.checked)} />
+                </label>
+              </div>
+              <div className="filter-section">
                 <h3 className="filter-section-title">Price</h3>
                 <div className="price-input-group">
                   <input
@@ -1175,8 +1207,11 @@ function App() {
                   <option value="featured">Featured</option>
                   <option value="price-asc">Price: Low to High</option>
                   <option value="price-desc">Price: High to Low</option>
-                  <option value="rating">Customer Rating</option>
+                  <option value="rating">Top Rated</option>
+                  <option value="discount">Biggest Discount</option>
                   <option value="newest">Newest Arrivals</option>
+                  <option value="name-asc">Name: A to Z</option>
+                  <option value="stock">Availability: Most in stock</option>
                 </select>
               </div>
               {productsLoading ? (
