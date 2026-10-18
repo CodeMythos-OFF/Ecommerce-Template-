@@ -165,6 +165,25 @@ const verifySuperAdminPin = (req) => {
   return Boolean(SUPER_ADMIN_DELETE_PIN && typeof pin === 'string' && pin.length >= 12 && pin === SUPER_ADMIN_DELETE_PIN);
 };
 
+const recordAuditLog = async (req, action, entityType, entityId = '', details = {}) => {
+  try {
+    const user = getSessionUser(req);
+    if (!user?.email) return;
+    await AuditLog.create({
+      actorEmail: String(user.email).toLowerCase(),
+      actorName: String(user.name || '').slice(0, 120),
+      action: String(action).slice(0, 80),
+      entityType: String(entityType).slice(0, 80),
+      entityId: String(entityId || '').slice(0, 160),
+      details,
+      createdAt: new Date()
+    });
+  } catch (error) {
+    console.error('Audit log write failed:', error.message);
+  }
+};
+
+
 // MongoDB Connection with proper error handling
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -398,6 +417,34 @@ const couponSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 const Coupon = mongoose.model('Coupon', couponSchema);
+
+const auditLogSchema = new mongoose.Schema({
+  actorEmail: { type: String, required: true, index: true },
+  actorName: { type: String, default: '' },
+  action: { type: String, required: true, index: true },
+  entityType: { type: String, required: true },
+  entityId: { type: String, default: '' },
+  details: { type: mongoose.Schema.Types.Mixed, default: {} },
+  createdAt: { type: Date, default: Date.now, index: true }
+});
+const AuditLog = mongoose.model('AuditLog', auditLogSchema);
+
+const supportTicketSchema = new mongoose.Schema({
+  ticketNumber: { type: String, required: true, unique: true },
+  userEmail: { type: String, required: true, index: true },
+  userName: { type: String, default: '' },
+  subject: { type: String, required: true, maxlength: 160 },
+  message: { type: String, required: true, maxlength: 5000 },
+  category: { type: String, enum: ['Order', 'Product', 'Seller', 'Account', 'Other'], default: 'Other' },
+  priority: { type: String, enum: ['Low', 'Normal', 'High', 'Urgent'], default: 'Normal' },
+  status: { type: String, enum: ['Open', 'In Progress', 'Resolved', 'Closed'], default: 'Open', index: true },
+  assignedTo: { type: String, default: '' },
+  response: { type: String, default: '', maxlength: 5000 },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
+
 
 const DEFAULT_COUPONS = [
   { code: 'WELCOME10', type: 'percent', value: 10, minSubtotal: 0, active: true },
@@ -1470,6 +1517,149 @@ app.delete('/api/coupons/:id', async (req, res) => {
   }
 });
 
+
+/* Phase 4: analytics, audit trail, support inbox, seller administration */
+app.get('/api/admin/analytics', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access required' });
+    const since = new Date();
+    since.setDate(since.getDate() - 29);
+    since.setHours(0, 0, 0, 0);
+    const [dailyOrders, statusCounts, topProducts, totals] = await Promise.all([
+      Order.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, orders: { $sum: 1 }, revenue: { $sum: '$total' } } },
+        { $sort: { _id: 1 } }
+      ]),
+      Order.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      Order.aggregate([
+        { $unwind: '$products' },
+        { $group: { _id: '$products.name', units: { $sum: '$products.quantity' }, revenue: { $sum: { $multiply: ['$products.price', '$products.quantity'] } } } },
+        { $sort: { units: -1 } }, { $limit: 5 }
+      ]),
+      Order.aggregate([{ $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: '$total' }, averageOrderValue: { $avg: '$total' } } }])
+    ]);
+    const [sellerCount, activeProductCount, ticketCounts] = await Promise.all([
+      Seller.countDocuments({ isApproved: true }),
+      Product.countDocuments({ isActive: true }),
+      SupportTicket.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }])
+    ]);
+    res.json({
+      dailyOrders,
+      statusCounts,
+      topProducts,
+      totals: totals[0] || { totalOrders: 0, totalRevenue: 0, averageOrderValue: 0 },
+      sellerCount,
+      activeProductCount,
+      ticketCounts
+    });
+  } catch (error) {
+    console.error('Admin analytics error:', error.message);
+    res.status(500).json({ error: 'Unable to load analytics' });
+  }
+});
+
+app.get('/api/admin/audit-logs', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access required' });
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 250);
+    const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(limit).lean().maxTimeMS(5000);
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to load audit logs' });
+  }
+});
+
+app.post('/api/support/tickets', async (req, res) => {
+  try {
+    const user = getSessionUser(req);
+    if (!user?.email) return res.status(401).json({ error: 'Please sign in to create a support ticket' });
+    const subject = String(req.body?.subject || '').trim();
+    const message = String(req.body?.message || '').trim();
+    const category = ['Order', 'Product', 'Seller', 'Account', 'Other'].includes(req.body?.category) ? req.body.category : 'Other';
+    if (subject.length < 4 || subject.length > 160 || message.length < 10 || message.length > 5000) {
+      return res.status(400).json({ error: 'Subject must be 4–160 characters and message 10–5000 characters' });
+    }
+    const ticket = await SupportTicket.create({
+      ticketNumber: `SMT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
+      userEmail: String(user.email).toLowerCase(),
+      userName: String(user.name || user.email.split('@')[0]).slice(0, 120),
+      subject, message, category
+    });
+    await recordAuditLog(req, 'ticket.created', 'support-ticket', ticket.ticketNumber, { category });
+    res.status(201).json(ticket);
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to create support ticket' });
+  }
+});
+
+app.get('/api/support/tickets', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.sessionUser) return res.status(401).json({ error: 'Authentication required' });
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 250);
+    const filter = access.isSuperAdmin ? {} : { userEmail: access.sessionUser.email.toLowerCase() };
+    const tickets = await SupportTicket.find(filter).sort({ updatedAt: -1 }).limit(limit).lean().maxTimeMS(5000);
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to load support tickets' });
+  }
+});
+
+app.patch('/api/support/tickets/:id', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access required' });
+    const allowedStatuses = ['Open', 'In Progress', 'Resolved', 'Closed'];
+    const allowedPriorities = ['Low', 'Normal', 'High', 'Urgent'];
+    const update = { updatedAt: new Date() };
+    if (req.body?.status !== undefined) {
+      if (!allowedStatuses.includes(req.body.status)) return res.status(400).json({ error: 'Invalid ticket status' });
+      update.status = req.body.status;
+    }
+    if (req.body?.priority !== undefined) {
+      if (!allowedPriorities.includes(req.body.priority)) return res.status(400).json({ error: 'Invalid ticket priority' });
+      update.priority = req.body.priority;
+    }
+    if (req.body?.response !== undefined) {
+      if (typeof req.body.response !== 'string' || req.body.response.length > 5000) return res.status(400).json({ error: 'Response must be under 5000 characters' });
+      update.response = req.body.response.trim();
+    }
+    if (req.body?.assignedTo !== undefined) update.assignedTo = String(req.body.assignedTo).trim().slice(0, 160);
+    const ticket = await SupportTicket.findByIdAndUpdate(req.params.id, { $set: update }, { new: true, runValidators: true });
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    await recordAuditLog(req, 'ticket.updated', 'support-ticket', ticket.ticketNumber, { status: ticket.status, priority: ticket.priority });
+    res.json(ticket);
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to update support ticket' });
+  }
+});
+
+app.put('/api/sellers/:email/profile', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access required' });
+    const email = decodeURIComponent(req.params.email).toLowerCase();
+    const updates = {};
+    for (const key of ['name', 'businessName', 'phone', 'address']) {
+      if (req.body?.[key] !== undefined) {
+        const value = String(req.body[key]).trim();
+        if (value.length > (key === 'address' ? 500 : 160)) return res.status(400).json({ error: `${key} is too long` });
+        updates[key] = value;
+      }
+    }
+    updates.updatedAt = new Date();
+    const seller = await Seller.findOneAndUpdate({ email }, { $set: updates }, { new: true, runValidators: true });
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+    await recordAuditLog(req, 'seller.profile_updated', 'seller', email, { fields: Object.keys(updates).filter((key) => key !== 'updatedAt') });
+    res.json(seller);
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to update seller profile' });
+  }
+});
+
 // Generate unique tracking ID
 const generateTrackingId = () => `SM${crypto.randomInt(100000, 1000000)}`;
 
@@ -1779,6 +1969,7 @@ app.delete('/api/orders/:id', async (req, res) => {
 
     const order = await Order.findByIdAndDelete(req.params.id).maxTimeMS(5000);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    await recordAuditLog(req, 'order.deleted', 'order', order.trackingId, { total: order.total, customer: order.user });
 
     let stats = await Stats.findOne().maxTimeMS(5000);
     if (stats && stats.totalOrders > 0) {
