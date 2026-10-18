@@ -882,6 +882,32 @@ app.post('/api/sellers/register', async (req, res) => {
   }
 });
 
+app.get('/api/storefront/:email', async (req, res) => {
+  try {
+    const email = String(req.params.email || '').trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid seller email' });
+    }
+    const seller = await Seller.findOne({ email, isApproved: true }).select('email name businessName createdAt').lean().maxTimeMS(5000);
+    if (!seller) return res.status(404).json({ error: 'Approved seller storefront not found' });
+
+    const products = await Product.find({ sellerEmail: email, isActive: true })
+      .select('id year cost img images category description sellerEmail sellerName sellerBusinessName brand stock averageRating reviewCount variants specifications relatedProductIds createdAt')
+      .sort({ createdAt: -1 }).lean().maxTimeMS(5000);
+    const reviewCount = products.reduce((sum, product) => sum + (Number(product.reviewCount) || 0), 0);
+    const ratingTotal = products.reduce((sum, product) => sum + ((Number(product.averageRating) || 0) * (Number(product.reviewCount) || 0)), 0);
+    res.json({
+      seller,
+      products,
+      reviewCount,
+      averageRating: reviewCount ? Number((ratingTotal / reviewCount).toFixed(1)) : 0
+    });
+  } catch (error) {
+    console.error('Get seller storefront error:', error.message);
+    res.status(500).json({ error: 'Unable to load seller storefront' });
+  }
+});
+
 app.get('/api/sellers/:email', async (req, res) => {
   try {
     const email = String(req.params.email || '').trim().toLowerCase();
