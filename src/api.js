@@ -149,6 +149,17 @@ export const getOrders = async (limit = 50, sellerEmail = null, userEmail = null
   return Array.isArray(data) ? data : [];
 };
 
+export const cancelOrder = async (orderId) => {
+  if (!orderId) throw new Error('Order ID is required');
+  const response = await fetchWithRetry(`${API_URL}/orders/${encodeURIComponent(orderId)}/cancel`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to cancel order');
+  return data;
+};
+
 export const deleteOrder = async (orderId, pin = '') => {
   try {
     if (!orderId) throw new Error('Order ID is required');
