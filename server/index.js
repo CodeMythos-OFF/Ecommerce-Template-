@@ -929,11 +929,16 @@ app.post('/api/sellers/register', async (req, res) => {
   }
 });
 
-app.get('/api/storefront/:email', async (req, res) => {
+const getSellerStorefront = async (req, res) => {
   try {
-    const email = String(req.params.email || '').trim().toLowerCase();
+    // Accept both query and path forms. Query form avoids email-address path
+    // encoding issues across browsers and serverless rewrite layers.
+    const rawEmail = req.query.email || req.params.email || '';
+    let email = String(rawEmail).trim();
+    try { email = decodeURIComponent(email); } catch { /* already decoded */ }
+    email = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'Invalid seller email' });
+      return res.status(400).json({ error: 'A valid seller email is required to open this storefront' });
     }
     const seller = await Seller.findOne({ email, isApproved: true }).select('email name businessName createdAt').lean().maxTimeMS(5000);
     if (!seller) return res.status(404).json({ error: 'Approved seller storefront not found' });
@@ -953,7 +958,9 @@ app.get('/api/storefront/:email', async (req, res) => {
     console.error('Get seller storefront error:', error.message);
     res.status(500).json({ error: 'Unable to load seller storefront' });
   }
-});
+};
+app.get('/api/storefront', getSellerStorefront);
+app.get('/api/storefront/:email', getSellerStorefront);
 
 app.get('/api/sellers/:email', async (req, res) => {
   try {
