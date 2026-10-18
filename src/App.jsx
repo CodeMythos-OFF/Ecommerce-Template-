@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Navigation from "./Navigation";
+import ShoppingAssistant from "./ShoppingAssistant";
 import Auth from "./Auth";
 import GoogleAuthService from "./services/GoogleAuthService";
 import AdminPanel from "./AdminPanel";
@@ -1784,6 +1785,8 @@ function App() {
           </div>
         )}
       </div>
+
+      <ShoppingAssistant products={products} onShowDetails={showProductDetails} />
     </>
   );
 }
