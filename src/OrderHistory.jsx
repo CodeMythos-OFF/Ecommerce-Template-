@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { getOrders, submitReview } from "./api";
+import { getOrders, submitReview, cancelOrder } from "./api";
+import { getCart, saveCart } from "./cartService";
 
 const STATUS_STEPS = ["Order Placed", "Processing", "Shipped", "Delivered"];
 
@@ -39,6 +40,50 @@ const OrderHistory = ({ currentUser }) => {
 
   const setReview = (key, patch) => setReviewStates((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
 
+  const handleCancelOrder = async (order) => {
+    const status = String(order.status || "Order Placed");
+    if (!["Order Placed", "Processing"].includes(status)) {
+      return Swal.fire({ icon: "info", title: "Cannot cancel", text: "Orders can only be cancelled before shipment." });
+    }
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Cancel this order?",
+      text: "This cannot be undone. Stock will be returned to inventory.",
+      showCancelButton: true,
+      confirmButtonText: "Cancel order",
+      cancelButtonText: "Keep order",
+      confirmButtonColor: "#dc3545"
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await cancelOrder(order._id || order.id);
+      await loadOrders(true);
+      Swal.fire({ icon: "success", title: "Order cancelled", timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ icon: "error", title: "Cancellation failed", text: error.message || "Please try again." });
+    }
+  };
+
+  const handleReorder = async (order) => {
+    if (!currentUser?.email) return;
+    const purchased = (order.cart || []).flatMap((item) => {
+      const productInfo = (order.products || []).find((product) => product.name === item.id);
+      const quantity = Math.max(1, Number(item.quantity) || 1);
+      return Array.from({ length: quantity }, () => ({
+        ...item,
+        quantity: undefined,
+        sellerEmail: productInfo?.sellerEmail || item.sellerEmail || "",
+        sellerName: productInfo?.sellerName || item.sellerName || ""
+      }));
+    });
+    if (!purchased.length) return Swal.fire({ icon: "info", title: "Items unavailable", text: "This order does not contain reusable product details." });
+    const existing = getCart(currentUser.email);
+    saveCart(currentUser.email, [...existing, ...purchased]);
+    window.dispatchEvent(new Event("cartUpdated"));
+    await Swal.fire({ icon: "success", title: "Items added to cart", text: "Review current prices and stock before checkout.", confirmButtonText: "View cart" });
+    window.location.hash = "#Cart";
+  };
+
   const submitItemReview = async (key, item, status, orderId) => {
     const state = reviewStates[key] || {};
     if (status.toLowerCase() !== "delivered") return Swal.fire({ icon: "info", title: "Not available yet", text: "Reviews unlock after delivery." });
@@ -75,6 +120,18 @@ const OrderHistory = ({ currentUser }) => {
             <div className="col-6 col-md-3"><small className="text-muted d-block text-uppercase fw-bold">Ship to</small>{order.address?.name || order.userName || "N/A"}</div>
             <div className="col-6 col-md-5 text-md-end"><small className="text-muted d-block">Order # {order.trackingId || String(orderId).slice(-8).toUpperCase()}</small><span className={"badge " + statusColor(status) + " px-3 py-2 rounded-pill mt-1"}>{status}</span></div>
           </div></div>
+          <div className="px-3 px-md-4 pt-3 d-flex flex-wrap gap-2 justify-content-end">
+            {["Order Placed", "Processing"].includes(String(status)) && (
+              <button className="btn btn-sm btn-outline-danger" onClick={() => handleCancelOrder(order)}>
+                <i className="bi bi-x-circle me-1"></i>Cancel order
+              </button>
+            )}
+            {status.toLowerCase() !== "cancelled" && (
+              <button className="btn btn-sm btn-outline-primary" onClick={() => handleReorder(order)}>
+                <i className="bi bi-arrow-repeat me-1"></i>Buy again
+              </button>
+            )}
+          </div>
           <div className="card-body p-3 p-md-4">
             <div className="row g-2 mb-4">{STATUS_STEPS.map((step, index) => <div className="col" key={step}><div className={"small text-center " + (index <= statusIndex ? "fw-bold text-primary" : "text-muted")}><div className={"rounded-pill mb-1 " + (index <= statusIndex ? "bg-primary" : "bg-light")} style={{ height: "6px" }}></div>{step}</div></div>)}</div>
             {(order.cart || []).map((item, index) => {
