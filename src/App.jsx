@@ -389,6 +389,15 @@ function App() {
   }, [loadProducts]);
 
   useEffect(() => {
+    const handleCartUpdated = () => {
+      const user = getCurrentUser() || currentUser;
+      if (user?.email) setCartItems(getCart(user.email));
+    };
+    window.addEventListener("cartUpdated", handleCartUpdated);
+    return () => window.removeEventListener("cartUpdated", handleCartUpdated);
+  }, [currentUser]);
+
+  useEffect(() => {
     const handleUserChange = () => {
       const user = getCurrentUser();
       setCurrentUser(user);
