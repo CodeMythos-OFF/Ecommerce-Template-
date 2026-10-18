@@ -964,7 +964,10 @@ app.get('/api/storefront/:email', getSellerStorefront);
 
 app.get('/api/sellers/:email', async (req, res) => {
   try {
-    const email = String(req.params.email || '').trim().toLowerCase();
+    let email = String(req.params.email || '').trim();
+    // Normalize legacy clients that send a percent-encoded email in the route.
+    try { email = decodeURIComponent(email); } catch { /* retain original value */ }
+    email = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid seller email' });
     const seller = await Seller.findOne({ email }).maxTimeMS(5000);
     if (!seller) {
