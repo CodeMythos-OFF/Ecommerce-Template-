@@ -1643,21 +1643,27 @@ app.patch('/api/support/tickets/:id', async (req, res) => {
 app.put('/api/sellers/:email/profile', async (req, res) => {
   try {
     const access = await getAccessContext(req);
-    if (!access?.isSuperAdmin) return res.status(403).json({ error: 'Super admin access required' });
+    if (!access?.sessionUser?.email) return res.status(401).json({ error: 'Authentication required' });
     const email = decodeURIComponent(req.params.email).toLowerCase();
+    const isSelf = access.sessionUser.email.toLowerCase() === email && access.isSeller;
+    if (!access.isSuperAdmin && !isSelf) return res.status(403).json({ error: 'You can only edit your own approved seller profile' });
     const updates = {};
     for (const key of ['name', 'businessName', 'phone', 'address']) {
       if (req.body?.[key] !== undefined) {
         const value = String(req.body[key]).trim();
-        if (value.length > (key === 'address' ? 500 : 160)) return res.status(400).json({ error: `${key} is too long` });
+        if (!value || value.length > (key === 'address' ? 500 : key === 'phone' ? 40 : 160)) return res.status(400).json({ error: `${key} is required and must be within the allowed length` });
         updates[key] = value;
       }
     }
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'No profile changes supplied' });
     updates.updatedAt = new Date();
     const seller = await Seller.findOneAndUpdate({ email }, { $set: updates }, { new: true, runValidators: true });
     if (!seller) return res.status(404).json({ error: 'Seller not found' });
+    if (isSelf) {
+      await Product.updateMany({ sellerEmail: email }, { $set: { sellerName: seller.name, sellerBusinessName: seller.businessName, brand: seller.businessName, updatedAt: new Date() } });
+    }
     await recordAuditLog(req, 'seller.profile_updated', 'seller', email, { fields: Object.keys(updates).filter((key) => key !== 'updatedAt') });
-    res.json(seller);
+    res.json({ success: true, seller });
   } catch (error) {
     res.status(500).json({ error: 'Unable to update seller profile' });
   }
