@@ -1,0 +1,39 @@
+.phase4-admin { color: #172033; }
+.phase4-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:20px; }
+.phase4-heading h3 { margin:0; font-weight:800; letter-spacing:-.03em; }
+.phase4-heading p { color:#667085; margin:6px 0 0; }
+.phase4-tabs { display:flex; gap:8px; overflow-x:auto; padding:5px; margin-bottom:18px; border:1px solid #e5eaf0; border-radius:13px; background:#fff; }
+.phase4-tabs button { border:0; border-radius:9px; padding:10px 14px; background:transparent; color:#667085; font-weight:700; white-space:nowrap; }
+.phase4-tabs button.active { background:#087f8c; color:#fff; }
+.phase4-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+.phase4-metrics article,.phase4-card { background:#fff; border:1px solid #e5eaf0; border-radius:14px; padding:18px; box-shadow:0 4px 14px rgba(23,32,51,.035); min-width:0; }
+.phase4-metrics article span,.phase4-metrics article strong { display:block; }
+.phase4-metrics article span { color:#667085; font-size:.82rem; }
+.phase4-metrics article strong { font-size:clamp(1.2rem,2.4vw,1.8rem); margin-top:8px; overflow-wrap:anywhere; }
+.phase4-panels { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px; }
+.phase4-card h4 { font-size:1.05rem; font-weight:800; margin:0 0 16px; }
+.phase4-bars { display:grid; gap:9px; }
+.phase4-bar-row { display:grid; grid-template-columns:48px minmax(0,1fr) 26px; align-items:center; gap:9px; font-size:.75rem; }
+.phase4-bar-row time { color:#667085; }
+.phase4-bar-row b { text-align:right; }
+.phase4-bar-track { height:10px; border-radius:99px; background:#eef2f6; overflow:hidden; }
+.phase4-bar-track span { display:block; height:100%; background:linear-gradient(90deg,#087f8c,#46b8a9); border-radius:99px; }
+.phase4-status-row { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid #edf0f4; font-size:.88rem; }
+.phase4-status-row:last-child { border-bottom:0; }
+.phase4-note { color:#667085; font-size:.78rem; margin:14px 0 0; }
+.phase4-card-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:12px; }
+.phase4-card-heading strong { overflow-wrap:anywhere; }
+.phase4-card-heading small { margin-top:5px; overflow-wrap:anywhere; }
+.phase4-ticket-list,.phase4-sellers { display:grid; gap:14px; }
+.phase4-ticket-status { flex:0 0 auto; display:inline-flex; padding:5px 9px; border-radius:99px; font-size:.72rem; font-weight:800; background:#fff3cd; color:#7a5700; }
+.phase4-ticket-status.status-resolved,.phase4-ticket-status.status-closed { background:#dcfce7; color:#166534; }
+.phase4-ticket-status.status-in-progress { background:#dbeafe; color:#1d4ed8; }
+.phase4-ticket-message { white-space:pre-wrap; overflow-wrap:anywhere; }
+.phase4-ticket-controls,.phase4-seller-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.phase4-ticket-controls label,.phase4-seller-fields label { display:grid; gap:6px; font-size:.78rem; font-weight:700; color:#667085; }
+.phase4-seller-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.phase4-seller-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.phase4-admin .table { font-size:.82rem; }
+.phase4-admin .table td { overflow-wrap:anywhere; }
+@media (max-width:900px) { .phase4-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .phase4-panels { grid-template-columns:1fr; } }
+@media (max-width:560px) { .phase4-heading { align-items:flex-start; } .phase4-heading h3 { font-size:1.15rem; } .phase4-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; } .phase4-metrics article,.phase4-card { padding:13px; } .phase4-ticket-controls,.phase4-seller-fields { grid-template-columns:1fr; } .phase4-card-heading { flex-direction:column; } .phase4-tabs button { padding:9px 11px; font-size:.8rem; } }
