@@ -69,7 +69,6 @@ export default function Phase4Admin({ currentUser }) {
   if (!currentUser?.isSuperAdmin) return <div className="alert alert-warning">Phase 4 management is available to the super admin only.</div>;
 
   const maxDaily = Math.max(1, ...(analytics?.dailyOrders || []).map(item => item.orders || 0));
-  const maxRevenue = Math.max(1, ...(analytics?.dailyOrders || []).map(item => item.revenue || 0));
   const ticketOpenCount = tickets.filter(ticket => !['Resolved', 'Closed'].includes(ticket.status)).length;
 
   return (
