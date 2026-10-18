@@ -2069,10 +2069,15 @@ app.post('/api/assistant/chat', async (req, res) => {
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const groqKey = process.env.GROQ_API_KEY;
     if (!openRouterKey && !groqKey) return res.status(503).json({ error: 'Configure OPENROUTER_API_KEY or GROQ_API_KEY in the backend environment to enable AI chat.' });
-    const useGroq = !openRouterKey && Boolean(groqKey);
+    // Allow the client to explicitly select Groq when both providers are configured.
+    const requestedProvider = String(req.body?.provider || '').toLowerCase();
+    const useGroq = requestedProvider === 'groq' ? Boolean(groqKey) : requestedProvider === 'openrouter' ? !openRouterKey ? false : false : (!openRouterKey && Boolean(groqKey));
+    if (requestedProvider === 'groq' && !groqKey) return res.status(503).json({ error: 'Groq is selected but GROQ_API_KEY is not configured on the backend.' });
+    if (requestedProvider === 'openrouter' && !openRouterKey) return res.status(503).json({ error: 'OpenRouter is selected but OPENROUTER_API_KEY is not configured on the backend.' });
     const endpoint = useGroq ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions';
     const apiKey = useGroq ? groqKey : openRouterKey;
-    const model = useGroq ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : (process.env.OPENROUTER_MODEL || 'openrouter/auto');
+    // Groq retired llama-3.3-70b-versatile for developer-tier usage; use a currently listed production model by default.
+    const model = useGroq ? (process.env.GROQ_MODEL || 'openai/gpt-oss-120b') : (process.env.OPENROUTER_MODEL || 'openrouter/auto');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
     let response;
@@ -2080,7 +2085,18 @@ app.post('/api/assistant/chat', async (req, res) => {
       response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, ...messages], temperature: 0.3, max_tokens: 450 }), signal: controller.signal });
     } finally { clearTimeout(timeout); }
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) { console.error('AI provider error:', response.status); return res.status(502).json({ error: 'AI provider is temporarily unavailable.' }); }
+    if (!response.ok) {
+      // Keep diagnostic details in server logs only; never return provider internals or keys to the browser.
+      const providerError = result?.error;
+      console.error('AI provider error:', {
+        provider: useGroq ? 'groq' : 'openrouter',
+        status: response.status,
+        code: providerError?.code || providerError?.type || null,
+        message: typeof providerError?.message === 'string' ? providerError.message.slice(0, 300) : null,
+        model
+      });
+      return res.status(502).json({ error: 'AI provider is temporarily unavailable.' });
+    }
     const reply = result?.choices?.[0]?.message?.content;
     if (typeof reply !== 'string' || !reply.trim()) return res.status(502).json({ error: 'AI provider returned an empty reply.' });
     return res.json({ reply: reply.trim().slice(0, 5000), provider: useGroq ? 'groq' : 'openrouter' });
