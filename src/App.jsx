@@ -1806,7 +1806,7 @@ function App() {
         )}
       </div>
 
-      <ShoppingAssistant products={products} onShowDetails={showProductDetails} />
+      <ShoppingAssistant products={products} onShowDetails={showProductDetails} onAddToCart={handleAddToCart} onGoToCart={() => handlePageChange("Cart")} />
     </>
   );
 }
