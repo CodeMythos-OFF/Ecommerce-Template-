@@ -1721,6 +1721,51 @@ app.get('/api/orders/:id', async (req, res) => {
   }
 });
 
+// Customer cancellation: only the owner can cancel before shipment.
+app.post('/api/orders/:id/cancel', async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) return res.status(401).json({ error: 'Authentication is required' });
+
+    const order = await Order.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: sessionUser.email.toLowerCase(),
+        status: { $in: ['Order Placed', 'Processing'] }
+      },
+      { $set: { status: 'Cancelled' } },
+      { new: true }
+    ).maxTimeMS(5000);
+
+    if (!order) {
+      const existing = await Order.findById(req.params.id).select('user status').maxTimeMS(5000);
+      if (!existing) return res.status(404).json({ error: 'Order not found' });
+      if (String(existing.user).toLowerCase() !== sessionUser.email.toLowerCase()) {
+        return res.status(403).json({ error: 'You can only cancel your own orders' });
+      }
+      return res.status(409).json({ error: 'This order can no longer be cancelled' });
+    }
+
+    // Return reserved stock when a cancellable order is cancelled.
+    for (const item of (order.products || [])) {
+      if (!item.name || !item.sellerEmail || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) continue;
+      await Product.updateOne(
+        { id: item.name, sellerEmail: String(item.sellerEmail).toLowerCase() },
+        { $inc: { stock: Number(item.quantity) }, $set: { updatedAt: new Date() } }
+      ).maxTimeMS(5000);
+    }
+
+    sendTemplateEmail('order_status', order.user, {
+      name: order.userName, email: order.user, orderId: order.trackingId,
+      total: order.total, status: order.status
+    });
+    return res.json({ success: true, order, message: 'Order cancelled and stock restored' });
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    return res.status(500).json({ error: 'Unable to cancel order right now' });
+  }
+});
+
 // Delete order permanently from MongoDB
 app.delete('/api/orders/:id', async (req, res) => {
   try {
