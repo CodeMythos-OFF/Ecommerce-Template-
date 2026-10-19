@@ -394,6 +394,34 @@ const statsSchema = new mongoose.Schema({
 });
 
 const Stats = mongoose.model('Stats', statsSchema);
+
+// Shared MongoDB-backed request quotas work across serverless instances, unlike an in-memory Map.
+const apiRateLimitSchema = new mongoose.Schema({
+  key: { type: String, required: true },
+  windowStart: { type: Number, required: true },
+  count: { type: Number, default: 0, min: 0 },
+  expiresAt: { type: Date, required: true }
+}, { versionKey: false });
+apiRateLimitSchema.index({ key: 1, windowStart: 1 }, { unique: true });
+apiRateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+const ApiRateLimit = mongoose.model('ApiRateLimit', apiRateLimitSchema);
+
+const consumeRateLimit = async (scope, identity, windowMs, limit) => {
+  const now = Date.now();
+  const windowStart = Math.floor(now / windowMs) * windowMs;
+  const key = crypto.createHash('sha256').update(`${scope}:${identity}`).digest('hex');
+  const filter = { key, windowStart };
+  const update = { $inc: { count: 1 }, $setOnInsert: { expiresAt: new Date(windowStart + windowMs + 120000) } };
+  let bucket;
+  try {
+    bucket = await ApiRateLimit.findOneAndUpdate(filter, update, { new: true, upsert: true, setDefaultsOnInsert: true }).maxTimeMS(5000);
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+    bucket = await ApiRateLimit.findOneAndUpdate(filter, { $inc: { count: 1 } }, { new: true }).maxTimeMS(5000);
+  }
+  if (!bucket) throw new Error('Rate-limit bucket could not be updated');
+  return { allowed: bucket.count <= limit, retryAfterSeconds: Math.max(1, Math.ceil((windowStart + windowMs - now) / 1000)) };
+};
 const microsoftEmailSchema = new mongoose.Schema({
   accountEmail: { type: String, required: true },
   encryptedTokenCache: { type: String, required: true },
@@ -1355,15 +1383,11 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-const recentViewRequests = new Map();
 app.post('/api/stats/view', async (req, res) => {
   try {
-    const now = Date.now();
     const clientKey = String(req.ip || req.socket.remoteAddress || 'unknown');
-    const lastSeen = recentViewRequests.get(clientKey) || 0;
-    if (now - lastSeen < 10000) return res.json(await Stats.findOne().lean().maxTimeMS(5000) || {});
-    recentViewRequests.set(clientKey, now);
-    if (recentViewRequests.size > 3000) for (const [key, timestamp] of recentViewRequests) if (now - timestamp > 60000) recentViewRequests.delete(key);
+    const quota = await consumeRateLimit('stats-view', clientKey, 10000, 1);
+    if (!quota.allowed) return res.json(await Stats.findOne().lean().maxTimeMS(5000) || {});
     const today = new Date().toLocaleDateString();
     const stats = await Stats.findOneAndUpdate({}, [{ $set: {
       totalViews: { $add: [{ $ifNull: ['$totalViews', 0] }, 1] },
@@ -2120,16 +2144,11 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
 });
 
 // AI shopping assistant: provider keys stay on the server.
-const assistantRequests = new Map();
 app.post('/api/assistant/chat', async (req, res) => {
   try {
-    const now = Date.now();
     const clientKey = String(req.ip || req.socket.remoteAddress || 'unknown');
-    const rate = assistantRequests.get(clientKey) || { count: 0, resetAt: now + 60000 };
-    if (now > rate.resetAt) { rate.count = 0; rate.resetAt = now + 60000; }
-    if (rate.count >= 12) return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
-    rate.count += 1; assistantRequests.set(clientKey, rate);
-    if (assistantRequests.size > 2000) for (const [key, item] of assistantRequests) if (now > item.resetAt) assistantRequests.delete(key);
+    const quota = await consumeRateLimit('assistant-chat', clientKey, 60000, 12);
+    if (!quota.allowed) return res.set('Retry-After', String(quota.retryAfterSeconds)).status(429).json({ error: 'Too many requests. Please wait before trying again.' });
 
     const messages = (Array.isArray(req.body?.messages) ? req.body.messages : []).slice(-8)
       .filter((m) => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
