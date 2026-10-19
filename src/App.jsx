@@ -315,6 +315,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    try { localStorage.removeItem("shopmaster_session_token"); } catch { /* Storage may be disabled. */ }
     let cancelled = false;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
