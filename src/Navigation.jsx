@@ -50,14 +50,9 @@ export default function Navigation({ activePage, onPageChange, search, setSearch
     try {
       await fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
-        credentials: 'include',
-        headers: (() => {
-          const token = localStorage.getItem('shopmaster_session_token');
-          return token ? { Authorization: `Bearer ${token}` } : {};
-        })()
+        credentials: 'include'
       });
     } catch (error) { console.warn('Logout request failed:', error); }
-    localStorage.removeItem('shopmaster_session_token');
     sessionStorage.removeItem('authUser');
     sessionStorage.removeItem('authToken');
     window.dispatchEvent(new Event('userChanged'));
