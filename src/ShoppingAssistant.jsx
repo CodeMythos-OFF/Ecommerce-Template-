@@ -143,8 +143,22 @@ export default function ShoppingAssistant({ products = [], currentUser = null, o
         </form>
         <p className="sm-assistant-note">You must review and confirm checkout yourself. Cash on Delivery only; no returns.</p>
       </section>}
-      <button type="button" className="sm-assistant-launcher" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-        <span aria-hidden="true">✦</span> {open ? "Close assistant" : "Ask ShopMaster AI"}
+      <button
+        type="button"
+        className={`sm-assistant-launcher ${open ? "is-open" : "is-idle"}`}
+        onClick={() => setOpen((value) => !value)}
+        aria-label={open ? "Close ShopMaster AI assistant" : "Open ShopMaster AI assistant"}
+        aria-expanded={open}
+        title={open ? "Close assistant" : "Ask ShopMaster AI"}
+      >
+        {open ? (
+          <span className="sm-assistant-close-icon" aria-hidden="true">×</span>
+        ) : (
+          <svg className="sm-assistant-orbit-icon" viewBox="0 0 56 56" aria-hidden="true">
+            <path className="sm-assistant-icon-spark" d="M28 12.5 C29.7 21.1 34.9 26.3 43.5 28 C34.9 29.7 29.7 34.9 28 43.5 C26.3 34.9 21.1 29.7 12.5 28 C21.1 26.3 26.3 21.1 28 12.5 Z" />
+            <path className="sm-assistant-icon-trail" d="M36.8 13.7 C40.8 16 43.4 19.9 44 24.4" />
+          </svg>
+        )}
       </button>
     </div>
   );
