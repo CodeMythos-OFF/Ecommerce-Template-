@@ -5,11 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "chmod +x node_modules/.bin/vite && vite build",
+    "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .js,.jsx",
-    "fix-permissions": "chmod +x node_modules/.bin/*",
-    "postinstall": "chmod +x node_modules/.bin/*"
+    "lint": "eslint . --ext .js,.jsx"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
