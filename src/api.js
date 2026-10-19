@@ -4,7 +4,7 @@ const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:500
 // Retry helper
 const fetchWithRetry = async (url, options = {}, retries = 2) => {
   try {
-    return await fetch(url, options);
+    return await fetch(url, { credentials: 'include', ...options });
   } catch (error) {
     if (retries > 0) {
       console.warn(`Retry attempt ${3 - retries} for ${url}`);
