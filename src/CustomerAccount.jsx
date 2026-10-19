@@ -4,8 +4,7 @@ import { addAddress, deleteAddress, getAddresses } from "./addressService";
 
 const API_URL = window.location.hostname === "localhost" ? "http://localhost:5000/api" : "/api";
 const supportRequest = async (path, options = {}) => {
-  const token = localStorage.getItem("shopmaster_session_token");
-  const response = await fetch(`${API_URL}${path}`, { credentials: "include", ...options, headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  const response = await fetch(`${API_URL}${path}`, { credentials: "include", ...options, headers: { ...(options.headers || {}) } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "Support request failed");
   return data;
