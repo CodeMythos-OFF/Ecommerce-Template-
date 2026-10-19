@@ -406,6 +406,29 @@ const emailTemplateSchema = new mongoose.Schema({
 });
 const EmailTemplate = mongoose.model('EmailTemplate', emailTemplateSchema);
 
+const legalDocumentSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true, enum: ['privacy', 'terms'] },
+  title: { type: String, required: true, maxlength: 120 },
+  content: { type: String, required: true, maxlength: 30000 },
+  updatedAt: { type: Date, default: Date.now },
+  updatedBy: { type: String, default: '' }
+});
+const LegalDocument = mongoose.model('LegalDocument', legalDocumentSchema);
+
+const DEFAULT_LEGAL_DOCUMENTS = {
+  "privacy": {
+    "key": "privacy",
+    "title": "Privacy Policy",
+    "content": "This Privacy Policy explains how ShopMaster collects, uses, stores, and protects information when you use our website and services.\n\n## 1. Information We Collect\nDepending on how you use ShopMaster, we may process account information such as your name, email address, and profile photo provided by Google sign-in; shopping information such as cart items, orders, delivery addresses, and product reviews; and technical information such as browser, device, and basic usage information needed to operate and improve the service.\n\n## 2. How We Use Information\nWe use information to provide and operate ShopMaster, authenticate users, process orders, maintain carts and preferences, provide customer features, prevent misuse, and improve the website.\n\n## 3. Google Sign-In\nIf you choose Google sign-in, authentication is handled through Google. We receive the account information permitted by that provider and use it to create or maintain your ShopMaster account.\n\n## 4. Storage and Security\nAccount and store data may be stored using third-party infrastructure providers, including MongoDB Atlas and Vercel. We take reasonable measures to protect information, but no internet service can guarantee absolute security.\n\n## 5. Sharing of Information\nWe do not sell personal information. Information may be processed by service providers when necessary to operate authentication, hosting, databases, or other website functionality.\n\n## 6. Cookies and Local Storage\nShopMaster may use browser storage such as session storage or local storage to maintain authentication state, carts, and preferences.\n\n## 7. Your Choices\nYou can stop using the service at any time. You may also sign out and, where applicable, request correction or deletion of information by contacting the site operator.\n\n## 8. Children's Privacy\nShopMaster is not intended to knowingly collect personal information from children without appropriate authorization. If you believe a child's information has been submitted improperly, please contact the site operator.\n\n## 9. Changes to This Policy\nThis Privacy Policy may be updated as ShopMaster changes. The updated version will be posted on this page with a new “Last updated” date.\n\n## 10. Contact\nFor privacy questions or requests, contact the ShopMaster site operator through the contact method provided on the website."
+  },
+  "terms": {
+    "key": "terms",
+    "title": "Terms and Conditions",
+    "content": "These Terms and Conditions govern your use of the ShopMaster website and services. By using ShopMaster, you agree to follow these terms.\n\n## 1. Using ShopMaster\nYou may use ShopMaster only for lawful purposes and in a way that does not interfere with the website, its users, or its services.\n\n## 2. Accounts\nSome features require an account. You are responsible for providing accurate information and for keeping access to your account secure. Sign-in may be provided through Google.\n\n## 3. Products and Orders\nProduct information, prices, availability, taxes, and shipping details may change. An order is subject to acceptance and availability. ShopMaster may correct errors or cancel an order when necessary.\n\n## 4. Payments and Taxes\nAny applicable taxes or charges will be shown during checkout where supported. ShopMaster currently supports Cash on Delivery where available. Any future payment processing may be handled by a third-party provider under that provider's terms.\n\n## 5. User Content\nIf you submit a review or other content, you should have the right to submit it and must not submit unlawful, misleading, abusive, or infringing material.\n\n## 6. Prohibited Conduct\nDo not attempt to gain unauthorized access, disrupt the service, introduce malicious code, abuse accounts, or use ShopMaster for fraud or other unlawful activity.\n\n## 7. Intellectual Property\nShopMaster's original software, branding, design, and other protected materials belong to their respective owners. You may not copy or redistribute protected material except as permitted by law.\n\n## 8. Third-Party Services\nShopMaster may depend on third-party services such as Google, Vercel, and MongoDB Atlas. Those services have their own terms and privacy policies.\n\n## 9. Availability and Disclaimer\nShopMaster is provided on an “as available” basis. We do not guarantee that the website will always be uninterrupted, error-free, or available.\n\n## 10. Changes\nThese terms may be updated when the service changes. The current version will be published on this page.\n\n## 11. Contact\nFor questions about these terms, contact the ShopMaster site operator through the contact method provided on the website."
+  }
+};
+
+
 const couponSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true, trim: true },
   type: { type: String, enum: ['percent', 'fixed', 'free_delivery'], required: true },
@@ -491,6 +514,14 @@ const initializeEmailTemplates = async () => {
 // Initialize all data
 const initializeData = async () => {
   try {
+    for (const document of Object.values(DEFAULT_LEGAL_DOCUMENTS)) {
+      await LegalDocument.findOneAndUpdate(
+        { key: document.key },
+        { $setOnInsert: { ...document, updatedAt: new Date(), updatedBy: 'system' } },
+        { upsert: true }
+      );
+    }
+
     for (const coupon of DEFAULT_COUPONS) {
       await Coupon.findOneAndUpdate(
         { code: coupon.code },
@@ -745,6 +776,53 @@ app.get('/api/auth/me', async (req, res) => {
 app.post('/api/auth/logout', (req, res) => {
   clearAuthCookie(res);
   return res.json({ success: true });
+});
+
+// ========== LEGAL DOCUMENT ROUTES ==========
+
+app.get('/api/legal/:key', async (req, res) => {
+  try {
+    const key = req.params.key;
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_LEGAL_DOCUMENTS, key)) {
+      return res.status(404).json({ error: 'Legal document not found' });
+    }
+    const document = await LegalDocument.findOne({ key }).lean().maxTimeMS(5000);
+    return res.json(document || DEFAULT_LEGAL_DOCUMENTS[key]);
+  } catch (error) {
+    console.error('Legal document read failed:', error.message);
+    return res.status(500).json({ error: 'Unable to load legal document' });
+  }
+});
+
+app.put('/api/legal/:key', async (req, res) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!access?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Only the super admin can edit legal documents' });
+    }
+    const key = req.params.key;
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_LEGAL_DOCUMENTS, key)) {
+      return res.status(404).json({ error: 'Legal document not found' });
+    }
+    const title = String(req.body?.title || '').trim();
+    const content = String(req.body?.content || '').trim();
+    if (!title || title.length > 120) {
+      return res.status(400).json({ error: 'Title is required and must be 120 characters or fewer' });
+    }
+    if (!content || content.length > 30000) {
+      return res.status(400).json({ error: 'Content is required and must be 30,000 characters or fewer' });
+    }
+    const document = await LegalDocument.findOneAndUpdate(
+      { key },
+      { $set: { title, content, updatedAt: new Date(), updatedBy: access.sessionUser.email.toLowerCase() } },
+      { new: true, upsert: true, runValidators: true }
+    ).lean();
+    await recordAuditLog(req, 'update', 'legal_document', key, { title, updatedAt: document.updatedAt });
+    return res.json({ success: true, document });
+  } catch (error) {
+    console.error('Legal document update failed:', error.message);
+    return res.status(500).json({ error: 'Unable to save legal document' });
+  }
 });
 
 // ========== EMAIL ROUTES ==========
