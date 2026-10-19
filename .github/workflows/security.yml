@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Generate frontend lockfile when the repository does not include one
+        run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
       - name: Check frontend dependencies
         run: npm audit --audit-level=high
