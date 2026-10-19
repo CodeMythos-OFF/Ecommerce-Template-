@@ -10,6 +10,7 @@ dotenv.config();
 
 const app = express();
 app.disable('x-powered-by');
+if (process.env.VERCEL === '1') app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '34579317567-tals9olen2trsjfs3gfualbdlfdkki7n.apps.googleusercontent.com';
 const AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET;
@@ -52,11 +53,19 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Super-Admin-Pin', 'X-Product-Seller-Email']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Super-Admin-Pin', 'X-Product-Seller-Email', 'Idempotency-Key']
 }));
 app.use(express.json({ limit: '1mb', strict: true }));
 app.use(express.urlencoded({ limit: '1mb', extended: false, parameterLimit: 100 }));
 
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const hasSessionCookie = (req.headers.cookie || '').split(';').some((part) => part.trim().startsWith('shopmaster_session='));
+  if (!hasSessionCookie) return next();
+  const origin = req.get('origin');
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) return res.status(403).json({ error: 'Request origin could not be verified. Refresh the page and try again.' });
+  next();
+});
 
 // ========== AUTHENTICATION HELPERS ==========
 
@@ -121,14 +130,14 @@ const setAuthCookie = (res, token) => {
   // SameSite=None by browsers with stricter cookie/privacy settings.
   res.setHeader(
     'Set-Cookie',
-    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=None; Secure`
+    `shopmaster_session=${token}; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
   );
 };
 
 const clearAuthCookie = (res) => {
   res.setHeader(
     'Set-Cookie',
-    'shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=None; Secure'
+    `shopmaster_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
   );
 };
 
@@ -324,6 +333,7 @@ const Review = mongoose.model('Review', reviewSchema);
 // Order Schema (updated with cart field for complete product details)
 const orderSchema = new mongoose.Schema({
   trackingId: { type: String, required: true, unique: true },
+  idempotencyKey: { type: String, default: undefined },
   user: { type: String, required: true },
   userName: { type: String, required: true },
   items: { type: Number, required: true },
@@ -369,6 +379,7 @@ const orderSchema = new mongoose.Schema({
   status: { type: String, default: 'Order Placed' }
 });
 
+orderSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 const Order = mongoose.model('Order', orderSchema);
 
 // Stats Schema
@@ -697,6 +708,7 @@ app.get('/api/health', (req, res) => {
 app.post('/api/auth/google/verify', async (req, res) => {
   try {
     const { credential } = req.body;
+    if (!isConnected) return res.status(503).json({ success: false, error: 'Database is not ready. Please retry shortly.' });
 
     if (!credential || typeof credential !== 'string') {
       return res.status(400).json({ success: false, error: 'Google credential is required' });
@@ -734,7 +746,7 @@ app.post('/api/auth/google/verify', async (req, res) => {
     const sessionToken = createSessionToken(user);
     sendTemplateEmail('welcome', user.email, user);
     setAuthCookie(res, sessionToken);
-    return res.json({ success: true, user, sessionToken });
+    return res.json({ success: true, user });
   } catch (error) {
     console.error('Google ID token verification failed:', error.message);
     return res.status(401).json({ success: false, error: 'Invalid Google credential' });
@@ -742,34 +754,21 @@ app.post('/api/auth/google/verify', async (req, res) => {
 });
 
 app.get('/api/auth/me', async (req, res) => {
-  const user = getSessionUser(req);
-
-  if (!user) {
-    // A missing session is a normal signed-out state, not a server error.
-    return res.json({ success: false, authenticated: false, user: null });
+  try {
+    const user = getSessionUser(req);
+    if (!user?.email) return res.json({ success: false, authenticated: false, user: null });
+    if (!isConnected) return res.status(503).json({ success: false, authenticated: false, user: null, error: 'Database is not ready. Please retry shortly.' });
+    const seller = await Seller.findOne({ email: user.email.toLowerCase() }).maxTimeMS(5000);
+    const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL;
+    return res.json({ success: true, authenticated: true, user: {
+      provider: user.provider, sub: user.sub, email: user.email, name: user.name, picture: user.picture || null,
+      isAdmin: isSuperAdmin || Boolean(seller?.isApproved), isSuperAdmin, isSeller: Boolean(seller?.isApproved),
+      sellerId: seller ? String(seller._id) : null, sellerName: seller?.name || null, sellerBusinessName: seller?.businessName || null
+    }});
+  } catch (error) {
+    console.error('Session restore failed:', error.message);
+    return res.status(isConnected ? 500 : 503).json({ success: false, authenticated: false, user: null, error: 'Unable to restore session right now' });
   }
-
-  return res.json({
-    success: true,
-    authenticated: true,
-    user: await (async () => {
-      const seller = await Seller.findOne({ email: user.email.toLowerCase() }).maxTimeMS(5000);
-      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL;
-      return {
-        provider: user.provider,
-        sub: user.sub,
-        email: user.email,
-        name: user.name,
-        picture: user.picture || null,
-        isAdmin: isSuperAdmin || Boolean(seller?.isApproved),
-        isSuperAdmin,
-        isSeller: Boolean(seller?.isApproved),
-        sellerId: seller ? String(seller._id) : null,
-        sellerName: seller?.name || null,
-        sellerBusinessName: seller?.businessName || null,
-      };
-    })(),
-  });
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -1351,30 +1350,26 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+const recentViewRequests = new Map();
 app.post('/api/stats/view', async (req, res) => {
   try {
-    let stats = await Stats.findOne().maxTimeMS(5000);
-    if (!stats) {
-      stats = await Stats.create({});
-    }
-
+    const now = Date.now();
+    const clientKey = String(req.ip || req.socket.remoteAddress || 'unknown');
+    const lastSeen = recentViewRequests.get(clientKey) || 0;
+    if (now - lastSeen < 10000) return res.json(await Stats.findOne().lean().maxTimeMS(5000) || {});
+    recentViewRequests.set(clientKey, now);
+    if (recentViewRequests.size > 3000) for (const [key, timestamp] of recentViewRequests) if (now - timestamp > 60000) recentViewRequests.delete(key);
     const today = new Date().toLocaleDateString();
-    
-    if (stats.lastViewDate !== today) {
-      stats.todayViews = 1;
-      stats.lastViewDate = today;
-    } else {
-      stats.todayViews += 1;
-    }
-    
-    stats.totalViews += 1;
-    stats.updatedAt = new Date();
-    
-    await stats.save();
-    res.json(stats);
+    const stats = await Stats.findOneAndUpdate({}, [{ $set: {
+      totalViews: { $add: [{ $ifNull: ['$totalViews', 0] }, 1] },
+      todayViews: { $cond: [{ $eq: ['$lastViewDate', today] }, { $add: [{ $ifNull: ['$todayViews', 0] }, 1] }, 1] },
+      totalOrders: { $ifNull: ['$totalOrders', 0] }, todayOrders: { $ifNull: ['$todayOrders', 0] },
+      lastOrderDate: { $ifNull: ['$lastOrderDate', today] }, lastViewDate: today, updatedAt: new Date()
+    } }], { new: true, upsert: true }).maxTimeMS(5000);
+    return res.json(stats);
   } catch (error) {
-    console.error('Track view error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Track view error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1449,8 +1444,10 @@ app.post('/api/reviews', async (req, res) => {
 
     if (!order) return res.status(403).json({ error: 'You can review this product only after it has been delivered to your account' });
 
-    const product = await Product.findOne({ id: productId }).lean().maxTimeMS(5000);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const purchasedLine = (order.products || []).find((item) => String(item.name) === productId && item.sellerEmail);
+    if (!purchasedLine) return res.status(403).json({ error: 'The delivered order does not contain this product from a valid seller' });
+    const product = await Product.findOne({ id: productId, sellerEmail: String(purchasedLine.sellerEmail).toLowerCase() }).lean().maxTimeMS(5000);
+    if (!product) return res.status(404).json({ error: 'Product not found for this seller' });
 
     const review = await Review.findOneAndUpdate(
       { productId, orderId, userEmail: sessionUser.email.toLowerCase() },
@@ -1474,7 +1471,7 @@ app.post('/api/reviews', async (req, res) => {
     const averageRating = summary[0] ? Number(summary[0].averageRating.toFixed(1)) : 0;
     const reviewCount = summary[0]?.reviewCount || 0;
 
-    await Product.updateMany({ id: productId }, { $set: { averageRating, reviewCount, updatedAt: new Date() } });
+    await Product.updateOne({ id: productId, sellerEmail: String(purchasedLine.sellerEmail).toLowerCase() }, { $set: { averageRating, reviewCount, updatedAt: new Date() } });
 
     res.status(201).json({ success: true, review, averageRating, reviewCount });
   } catch (error) {
@@ -1769,8 +1766,12 @@ app.post('/api/orders', async (req, res) => {
     }
 
     const sessionUser = getSessionUser(req);
-    if (!sessionUser?.email || sessionUser.email.toLowerCase() !== String(user || '').toLowerCase()) {
-      return res.status(403).json({ error: 'You can only place orders for your own account' });
+    if (!sessionUser?.email || sessionUser.email.toLowerCase() !== String(user || '').toLowerCase()) return res.status(403).json({ error: 'You can only place orders for your own account' });
+    const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
+    if (idempotencyKey && !/^[a-zA-Z0-9_-]{16,100}$/.test(idempotencyKey)) return res.status(400).json({ error: 'Invalid order request key' });
+    if (idempotencyKey) {
+      const existingOrder = await Order.findOne({ idempotencyKey, user: sessionUser.email.toLowerCase() }).maxTimeMS(5000);
+      if (existingOrder) return res.status(200).json({ order: existingOrder, message: 'Order already created' });
     }
 
     if (!Array.isArray(products) || products.length === 0 || products.length > 100) {
@@ -1882,6 +1883,7 @@ app.post('/api/orders', async (req, res) => {
     try {
       order = await Order.create({
       trackingId,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
       user,
       userName: String(sessionUser.name || sessionUser.email.split('@')[0]).slice(0, 120),
       items: trustedProducts.reduce((sum, item) => sum + item.quantity, 0),
@@ -1916,35 +1918,25 @@ app.post('/api/orders', async (req, res) => {
       throw orderCreateError;
     }
 
-    // Update stats
-    let stats = await Stats.findOne().maxTimeMS(5000);
-    if (!stats) {
-      stats = await Stats.create({});
-    }
-
-    const today = new Date().toLocaleDateString();
-    
-    if (stats.lastOrderDate !== today) {
-      stats.todayOrders = 1;
-      stats.lastOrderDate = today;
-    } else {
-      stats.todayOrders += 1;
-    }
-    
-    stats.totalOrders += 1;
-    stats.updatedAt = new Date();
-    
-    await stats.save();
-
-    sendTemplateEmail('order_confirmation', order.user, { name: order.userName, email: order.user, orderId: order.trackingId, total: order.total, status: order.status });
-
-    res.status(201).json({ 
-      order, 
-      stats, 
-      message: 'Order created successfully' 
-    });
+    let stats = null;
+    try {
+      const today = new Date().toLocaleDateString();
+      stats = await Stats.findOneAndUpdate({}, [{ $set: {
+        totalViews: { $ifNull: ['$totalViews', 0] }, todayViews: { $ifNull: ['$todayViews', 0] },
+        totalOrders: { $add: [{ $ifNull: ['$totalOrders', 0] }, 1] },
+        todayOrders: { $cond: [{ $eq: ['$lastOrderDate', today] }, { $add: [{ $ifNull: ['$todayOrders', 0] }, 1] }, 1] },
+        lastViewDate: { $ifNull: ['$lastViewDate', today] }, lastOrderDate: today, updatedAt: new Date()
+      } }], { new: true, upsert: true }).maxTimeMS(5000);
+    } catch (statsError) { console.error('Order saved but analytics update failed:', statsError.message); }
+    Promise.resolve().then(() => sendTemplateEmail('order_confirmation', order.user, { name: order.userName, email: order.user, orderId: order.trackingId, total: order.total, status: order.status }))
+      .catch((emailError) => console.error('Order confirmation email failed:', emailError.message));
+    return res.status(201).json({ order, stats, message: 'Order created successfully' });
   } catch (error) {
-    console.error('Create order error:', error);
+    if (error?.code === 11000) {
+      const key = String(req.get('Idempotency-Key') || '').trim();
+      if (key) { const existingOrder = await Order.findOne({ idempotencyKey: key }).catch(() => null); if (existingOrder) return res.status(200).json({ order: existingOrder, message: 'Order already created' }); }
+    }
+    console.error('Create order error:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2098,16 +2090,20 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status value' });
     }
 
-    const statusFilter = { _id: orderId };
+    const existingOrder = await Order.findById(orderId).maxTimeMS(5000);
+    if (!existingOrder) return res.status(404).json({ error: 'Order not found' });
     if (!access.isSuperAdmin) {
-      statusFilter['products.sellerEmail'] = access.sessionUser.email.toLowerCase();
+      const sellerEmail = access.sessionUser.email.toLowerCase();
+      const orderSellers = [...new Set((existingOrder.products || []).map((item) => String(item.sellerEmail || '').toLowerCase()).filter(Boolean))];
+      if (!orderSellers.includes(sellerEmail)) return res.status(403).json({ error: 'You do not manage products in this order' });
+      if (orderSellers.some((email) => email !== sellerEmail)) return res.status(403).json({ error: 'Orders containing products from multiple sellers must be updated by the super admin' });
     }
-
-    const order = await Order.findOneAndUpdate(
-      statusFilter,
-      { status },
-      { new: true, runValidators: true }
-    );
+    const transitions = { 'Order Placed': ['Processing'], Processing: ['Shipped'], Shipped: ['Delivered'], Delivered: [] };
+    if (existingOrder.status !== status && !(transitions[existingOrder.status] || []).includes(status)) return res.status(409).json({ error: `Cannot change order status from ${existingOrder.status} to ${status}` });
+    const order = existingOrder.status === status ? existingOrder : await Order.findOneAndUpdate(
+      { _id: orderId, status: existingOrder.status }, { $set: { status } }, { new: true, runValidators: true }
+    ).maxTimeMS(5000);
+    if (!order) return res.status(409).json({ error: 'Order status changed concurrently. Refresh and try again.' });
 
     if (!order) {
       return res.status(404).json({ error: 'Order not found or you do not manage any products in this order' });
@@ -2126,7 +2122,7 @@ const assistantRequests = new Map();
 app.post('/api/assistant/chat', async (req, res) => {
   try {
     const now = Date.now();
-    const clientKey = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    const clientKey = String(req.ip || req.socket.remoteAddress || 'unknown');
     const rate = assistantRequests.get(clientKey) || { count: 0, resetAt: now + 60000 };
     if (now > rate.resetAt) { rate.count = 0; rate.resetAt = now + 60000; }
     if (rate.count >= 12) return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
