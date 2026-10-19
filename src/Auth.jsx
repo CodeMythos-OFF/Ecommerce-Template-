@@ -68,6 +68,7 @@ const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
   // Restore the server-side session on every mount. If the cookie/session is gone,
   // clear the cached browser user instead of waiting forever on the loading screen.
   useEffect(() => {
+    try { localStorage.removeItem('shopmaster_session_token'); } catch { /* Storage may be disabled. */ }
     let cancelled = false;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
