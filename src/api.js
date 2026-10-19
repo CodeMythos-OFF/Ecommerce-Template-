@@ -416,6 +416,26 @@ export const sendMicrosoftTestEmail = async (to) => {
 };
 
 
+export const getLegalDocument = async (key) => {
+  if (!['privacy', 'terms'].includes(key)) throw new Error('Unknown legal document');
+  const response = await fetchWithRetry(`${API_URL}/legal/${encodeURIComponent(key)}`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to load legal document');
+  return data;
+};
+
+export const updateLegalDocument = async (key, document) => {
+  if (!['privacy', 'terms'].includes(key)) throw new Error('Unknown legal document');
+  const response = await fetchWithRetry(`${API_URL}/legal/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ title: document.title, content: document.content })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Failed to save legal document');
+  return data.document;
+};
+
 export const getProductReviews = async (productId) => {
   const response = await fetchWithRetry(`${API_URL}/reviews/product/${encodeURIComponent(productId)}`);
   const data = await response.json().catch(() => ({}));
