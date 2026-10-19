@@ -780,6 +780,7 @@ app.post('/api/auth/logout', (req, res) => {
 // ========== LEGAL DOCUMENT ROUTES ==========
 
 app.get('/api/legal/:key', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   try {
     const key = req.params.key;
     if (!Object.prototype.hasOwnProperty.call(DEFAULT_LEGAL_DOCUMENTS, key)) {
