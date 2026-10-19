@@ -2110,9 +2110,10 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
     ).maxTimeMS(5000);
     if (!order) return res.status(409).json({ error: 'Order status changed concurrently. Refresh and try again.' });
 
-    sendTemplateEmail('order_status', order.user, { name: order.userName, email: order.user, orderId: order.trackingId, total: order.total, status: order.status });
+    Promise.resolve().then(() => sendTemplateEmail('order_status', order.user, { name: order.userName, email: order.user, orderId: order.trackingId, total: order.total, status: order.status }))
+      .catch((emailError) => console.error('Order status email failed:', emailError.message));
 
-    res.json({ message: 'Order status updated successfully', order });
+    return res.json({ message: 'Order status updated successfully', order });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
