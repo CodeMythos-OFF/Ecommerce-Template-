@@ -33,7 +33,7 @@ export default function TermsOfService() {
           <span className="legal-eyebrow">SHOPMASTER</span>
           <h1>{document.title}</h1>
           <p className="legal-updated">Last updated: {updatedLabel}</p>
-          {document.content.split(/\\r?\\n/).map((line, index) => {
+          {document.content.split(/\r?\n/).map((line, index) => {
             const trimmed = line.trim();
             if (!trimmed) return null;
             if (trimmed.startsWith("## ")) {
