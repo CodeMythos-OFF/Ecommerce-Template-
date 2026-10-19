@@ -1,1 +1,67 @@
 .sm-assistant{position:fixed;right:18px;bottom:22px;z-index:1100;font-family:inherit}.sm-assistant-launcher{border:0;border-radius:999px;background:#0d233d;color:#fff;padding:13px 18px;box-shadow:0 8px 28px #0d233d44;font-weight:700}.sm-assistant-launcher span{color:#ffd54f;margin-right:5px}.sm-assistant-panel{width:min(370px,calc(100vw - 28px));height:min(520px,calc(100dvh - 110px));margin-bottom:12px;background:#fff;border:1px solid #dce3ed;border-radius:18px;box-shadow:0 18px 55px #07172b35;display:flex;flex-direction:column;overflow:hidden}.sm-assistant-header{display:flex;justify-content:space-between;align-items:center;padding:15px 16px;background:#0d233d;color:#fff}.sm-assistant-header small{display:block;color:#d4deed;font-size:12px;margin-top:3px}.sm-assistant-header button{border:0;background:transparent;color:#fff;font-size:27px;line-height:1}.sm-assistant-messages{padding:14px;overflow-y:auto;flex:1;background:#f6f8fb}.sm-assistant-message{white-space:pre-wrap;overflow-wrap:anywhere;border-radius:13px;padding:10px 12px;margin-bottom:10px;font-size:14px;line-height:1.45;max-width:94%}.sm-assistant-message.assistant{background:#fff;border:1px solid #e3e8f0;color:#17253b;margin-right:auto}.sm-assistant-message.user{background:#dcecff;color:#122b4b;margin-left:auto}.sm-assistant-error{font-size:12px;color:#a12828;padding:6px}.sm-assistant-form{display:flex;gap:8px;padding:12px;border-top:1px solid #e3e8f0}.sm-assistant-form input{min-width:0;flex:1;border:1px solid #d6deea;border-radius:10px;padding:10px}.sm-assistant-form button{border:0;border-radius:10px;padding:0 15px;background:#0d233d;color:#fff}.sm-assistant-form button:disabled{opacity:.5}.sm-assistant-note{font-size:10px;color:#68778c;padding:0 12px 10px;margin:0}@media(max-width:600px){.sm-assistant{right:12px;bottom:76px}.sm-assistant-launcher{padding:11px 14px}.sm-assistant-panel{height:min(480px,calc(100dvh - 170px))}}
+
+/* Compact idle launcher: a circle with a curved sparkle mark inside. */
+.sm-assistant-launcher {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 22%, #24486d 0%, #0d233d 68%);
+  color: #fff;
+  box-shadow: 0 8px 28px rgba(13, 35, 61, 0.32), 0 0 0 4px rgba(13, 35, 61, 0.07);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.sm-assistant-launcher:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 32px rgba(13, 35, 61, 0.38), 0 0 0 5px rgba(13, 35, 61, 0.08);
+}
+.sm-assistant-launcher:focus-visible {
+  outline: 3px solid #8ec5ff;
+  outline-offset: 4px;
+}
+.sm-assistant-orbit-icon {
+  display: block;
+  width: 42px;
+  height: 42px;
+  overflow: visible;
+}
+.sm-assistant-icon-spark {
+  fill: #ffd76a;
+  stroke: #fff0bd;
+  stroke-width: 0.65;
+  stroke-linejoin: round;
+}
+.sm-assistant-icon-trail {
+  fill: none;
+  stroke: #fff0bd;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.95;
+}
+.sm-assistant-close-icon {
+  color: #fff;
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+@media (max-width: 600px) {
+  .sm-assistant-launcher {
+    width: 54px;
+    height: 54px;
+  }
+  .sm-assistant-orbit-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sm-assistant-launcher {
+    transition: none;
+  }
+}
