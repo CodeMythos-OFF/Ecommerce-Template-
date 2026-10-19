@@ -15,13 +15,7 @@ const fetchWithRetry = async (url, options = {}, retries = 2) => {
   }
 };
 
-const getAuthHeaders = (extra = {}) => {
-  const token = localStorage.getItem('shopmaster_session_token');
-  return {
-    ...extra,
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
-  };
-};
+const getAuthHeaders = (extra = {}) => ({ ...extra });
 
 export const checkBackendHealth = async () => {
   try {
@@ -119,13 +113,19 @@ export const createOrder = async (orderData) => {
     throw new Error('Invalid order data: missing user information');
   }
 
+  let idempotencyKey = sessionStorage.getItem('shopmaster_order_idempotency_key');
+  if (!idempotencyKey) {
+    idempotencyKey = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g, '') : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem('shopmaster_order_idempotency_key', idempotencyKey);
+  }
   const response = await fetchWithRetry(`${API_URL}/orders`, {
-    method: 'POST',
-    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    method: 'POST', credentials: 'include',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey }),
     body: JSON.stringify(orderData)
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Failed to create order');
+  sessionStorage.removeItem('shopmaster_order_idempotency_key');
   return data;
 };
 
