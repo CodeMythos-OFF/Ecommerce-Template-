@@ -418,7 +418,7 @@ export const sendMicrosoftTestEmail = async (to) => {
 
 export const getLegalDocument = async (key) => {
   if (!['privacy', 'terms'].includes(key)) throw new Error('Unknown legal document');
-  const response = await fetchWithRetry(`${API_URL}/legal/${encodeURIComponent(key)}`);
+  const response = await fetchWithRetry(`${API_URL}/legal/${encodeURIComponent(key)}`, { cache: 'no-store' });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Failed to load legal document');
   return data;
