@@ -15,7 +15,6 @@ const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
   const googleButtonRenderedRef = useRef(false);
 
   const clearUser = useCallback(() => {
-    localStorage.removeItem('shopmaster_session_token');
     sessionStorage.removeItem('authUser');
     googleButtonRenderedRef.current = false;
     setUserInfo(null);
@@ -50,11 +49,10 @@ const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
       });
 
       const data = await result.json().catch(() => ({}));
-      if (!result.ok || !data.success || !data.user || !data.sessionToken) {
+      if (!result.ok || !data.success || !data.user) {
         throw new Error(data.error || 'Google sign-in verification failed');
       }
 
-      localStorage.setItem('shopmaster_session_token', data.sessionToken);
       applyUser(data.user);
     } catch (error) {
       console.error('Google sign-in failed:', error);
@@ -76,11 +74,9 @@ const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
 
     const restoreSession = async () => {
       try {
-        const token = localStorage.getItem('shopmaster_session_token');
         const result = await fetch(`${API_URL}/auth/me`, {
           method: 'GET',
           credentials: 'include',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: 'no-store',
           signal: controller.signal,
         });
@@ -179,7 +175,6 @@ const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
       console.warn('Logout request failed:', error);
     }
 
-    localStorage.removeItem('shopmaster_session_token');
     GoogleAuthService.signOut();
     clearUser();
     setIsLoading(false);
