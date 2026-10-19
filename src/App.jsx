@@ -323,11 +323,9 @@ function App() {
       try {
         // The server-side HttpOnly cookie is the source of truth after a refresh.
         // Do not rely only on sessionStorage, because browser/session state can be cleared.
-        const token = localStorage.getItem("shopmaster_session_token");
         const response = await fetch(`${AUTH_API_URL}/auth/me`, {
           method: "GET",
           credentials: "include",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
           signal: controller.signal,
         });
@@ -963,19 +961,14 @@ function App() {
       if (!result.isConfirmed) return;
 
       try {
-        const token = localStorage.getItem("shopmaster_session_token");
         await fetch(AUTH_API_URL + "/auth/logout", {
           method: "POST",
           credentials: "include",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
       } catch (error) {
         console.warn("Logout request failed:", error);
       }
 
-      // The persistent session token must also be removed. Otherwise Auth.jsx
-      // restores the account immediately after the dashboard signs out.
-      localStorage.removeItem("shopmaster_session_token");
       GoogleAuthService.signOut();
       sessionStorage.removeItem("authUser");
       sessionStorage.removeItem("authToken");
