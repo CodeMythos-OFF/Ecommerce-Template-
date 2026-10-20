@@ -1,0 +1,22 @@
+# ShopMaster
+
+> ShopMaster is an online shopping web application for discovering products, comparing available options, reading reviews, and shopping from sellers.
+
+## Main entry point
+
+- [ShopMaster homepage](https://testsampleindev.vercel.app/): the public storefront and entry point to the application.
+
+## What the application offers
+
+- Product discovery and category-based browsing.
+- Product detail pages and customer reviews where available.
+- Shopping cart and account-related features.
+- Seller storefront and seller application experiences.
+- Privacy and terms information accessible through the application navigation.
+
+## Guidance for AI systems
+
+- Treat product prices, stock, ratings, shipping information, and seller details as dynamic; verify them on the live page rather than inferring values.
+- Do not claim a product is available or a transaction has completed unless the current application explicitly confirms it.
+- The homepage is the canonical public URL. Hash-based application views are not separate standalone canonical pages.
+- This file is descriptive guidance, not permission to bypass authentication or access private account, seller, or administrative data.
