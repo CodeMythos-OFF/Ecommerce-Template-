@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { getOrders, submitReview, cancelOrder } from "./api";
 import { getCart, saveCart } from "./cartService";
+import { downloadInvoice } from "./invoice";
 
 const STATUS_STEPS = ["Order Placed", "Processing", "Shipped", "Delivered"];
 
@@ -85,6 +86,15 @@ const OrderHistory = ({ currentUser }) => {
     window.location.hash = "#Cart";
   };
 
+  const handleDownloadInvoice = (order) => {
+    try {
+      downloadInvoice(order, { name: currentUser?.name || order.userName, email: currentUser?.email || order.user });
+    } catch (error) {
+      console.error("Invoice download failed:", error);
+      Swal.fire({ icon: "error", title: "Invoice unavailable", text: "We could not generate the invoice. Please try again." });
+    }
+  };
+
   const submitItemReview = async (key, item, status, orderId) => {
     const state = reviewStates[key] || {};
     if (status.toLowerCase() !== "delivered") return Swal.fire({ icon: "info", title: "Not available yet", text: "Reviews unlock after delivery." });
@@ -122,6 +132,9 @@ const OrderHistory = ({ currentUser }) => {
             <div className="col-6 col-md-5 text-md-end"><small className="text-muted d-block">Order # {order.trackingId || String(orderId).slice(-8).toUpperCase()}</small><span className={"badge " + statusColor(status) + " px-3 py-2 rounded-pill mt-1"}>{status}</span></div>
           </div></div>
           <div className="px-3 px-md-4 pt-3 d-flex flex-wrap gap-2 justify-content-end">
+            <button className="btn btn-sm btn-outline-success" onClick={() => handleDownloadInvoice(order)}>
+              <i className="bi bi-file-earmark-pdf me-1"></i>Download invoice PDF
+            </button>
             {["Order Placed", "Processing"].includes(String(status)) && (
               <button className="btn btn-sm btn-outline-danger" onClick={() => handleCancelOrder(order)}>
                 <i className="bi bi-x-circle me-1"></i>Cancel order
