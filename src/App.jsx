@@ -1903,15 +1903,17 @@ function App() {
       </footer>
 
       <div id="orderhistory" className={`page ${activePage === "orderhistory" ? "active" : ""}`}>
-        {currentUser ? (
-          {activePage === "orderhistory" && <OrderHistory currentUser={currentUser} />}
-        ) : (
-          <div className="container my-5">
-            <div className="text-center">
-              <h2>Please sign in to view your order history</h2>
-              {activePage === "orderhistory" && <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />}
+        {activePage === "orderhistory" && (
+          currentUser ? (
+            <OrderHistory currentUser={currentUser} />
+          ) : (
+            <div className="container my-5">
+              <div className="text-center">
+                <h2>Please sign in to view your order history</h2>
+                <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />
+              </div>
             </div>
-          </div>
+          )
         )}
       </div>
 
