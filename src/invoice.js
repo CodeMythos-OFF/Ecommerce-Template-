@@ -1,8 +1,28 @@
 const money = (v) => `INR ${Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-const esc = (v) => String(v ?? "").normalize("NFKD").replace(/[^\x20-\x7E]/g, "").replace(/[\\()]/g, "\\$&");
+const winAnsiByte = (code) => {
+  const special = { 0x20AC: 0x80, 0x201A: 0x82, 0x192: 0x83, 0x201E: 0x84, 0x2026: 0x85, 0x2020: 0x86, 0x2021: 0x87, 0x2C6: 0x88, 0x2030: 0x89, 0x160: 0x8A, 0x2039: 0x8B, 0x152: 0x8C, 0x17D: 0x8E, 0x2018: 0x91, 0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97, 0x2DC: 0x98, 0x2122: 0x99, 0x161: 0x9A, 0x203A: 0x9B, 0x153: 0x9C, 0x17E: 0x9E, 0x178: 0x9F };
+  return special[code] ?? (code >= 0x20 && code <= 0x7E ? code : code >= 0xA0 && code <= 0xFF ? code : null);
+};
+const esc = (v) => {
+  let out = "";
+  for (const ch of String(v ?? "").normalize("NFC")) {
+    const byte = winAnsiByte(ch.codePointAt(0));
+    if (byte === null) { out += "?"; continue; }
+    if (byte === 0x5C || byte === 0x28 || byte === 0x29) out += String.fromCharCode(92) + ch;
+    else if (byte < 0x20 || byte > 0x7E) out += String.fromCharCode(92) + byte.toString(8).padStart(3, "0");
+    else out += ch;
+  }
+  return out;
+};
 const wrap = (v, max = 40) => {
   const out = []; let line = "";
-  for (const word of String(v || "").split(/\s+/).filter(Boolean)) {
+  const words = String(v || "").split(/\s+/).filter(Boolean).flatMap((word) => {
+    if (word.length <= max) return [word];
+    const chunks = [];
+    for (let i = 0; i < word.length; i += max - 1) chunks.push(word.slice(i, i + max - 1) + (i + max - 1 < word.length ? "…" : ""));
+    return chunks;
+  });
+  for (const word of words) {
     if ((line + " " + word).trim().length > max && line) { out.push(line); line = word; }
     else line = (line + " " + word).trim();
   }
@@ -57,7 +77,7 @@ const renderPage = ({ order, customer, items, start, end, page, pages, last }) =
   put(405, 483, "UNIT PRICE", 8, "1 1 1", true); put(490, 483, "AMOUNT", 8, "1 1 1", true);
   let y = 454;
   for (let i = start; i < end; i++) {
-    const item = items[i], name = String(item.id || item.name || "Product");
+    const item = items[i], name = String(item.id || item.name || "Product").slice(0, 120);
     const qty = Math.max(1, Number(item.quantity) || 1), price = Number(item.cost ?? item.price ?? 0);
     const wrapped = wrap(name, 40), h = Math.max(34, wrapped.length * 11 + 18);
     if ((i - start) % 2) rect(40, y - h + 7, 515, h, "0.975 0.98 0.99");
@@ -72,8 +92,10 @@ const renderPage = ({ order, customer, items, start, end, page, pages, last }) =
     put(40, top - 38, "Thank you for choosing ShopMaster.", 9, blue, true);
     put(40, top - 53, "This invoice was generated electronically.", 7, muted);
     rect(330, bottom, 225, Math.max(98, top - bottom), "0.95 0.97 1");
-    const rows = [["Subtotal", money(order.subtotal)]];
-    if (Number(order.discountAmount) > 0) rows.push(["Discount", `-${money(order.discountAmount)}`]);
+    const discount = Number(order.discountAmount) || 0;
+    const grossSubtotal = Number(order.subtotal) + discount;
+    const rows = [["Subtotal", money(grossSubtotal)]];
+    if (discount > 0) rows.push(["Discount", `-${money(discount)}`]);
     rows.push(["Delivery / shipping", money(order.shippingAmount)]);
     if (Number(order.taxAmount) > 0) rows.push(["Tax", money(order.taxAmount)]);
     rows.forEach(([label, value], i) => { put(343, top - 20 - i * 18, label, 8, label === "Discount" ? "0.08 0.48 0.32" : ink); put(535 - value.length * 4.4, top - 20 - i * 18, value, 8, ink); });
@@ -89,13 +111,27 @@ const renderPage = ({ order, customer, items, start, end, page, pages, last }) =
 export const downloadInvoice = (order, customer = {}) => {
   if (!order) throw new Error("Order information is unavailable.");
   const items = Array.isArray(order.cart) && order.cart.length ? order.cart : (order.products || []).map((p) => ({ id: p.name, quantity: p.quantity, cost: p.price }));
-  const perPage = 5;
-  const pageCount = Math.max(1, Math.ceil(items.length / perPage));
-  const streams = [];
-  for (let page = 0; page < pageCount; page++) {
-    const start = page * perPage, end = Math.min(items.length, start + perPage);
-    streams.push(renderPage({ order, customer, items, start, end, page, pages: pageCount, last: page === pageCount - 1 }));
+  const pageRanges = [];
+  let start = 0;
+  const maxItemHeight = 170;
+  while (start < items.length) {
+    let end = start;
+    let height = 0;
+    while (end < items.length) {
+      const name = String(items[end]?.id || items[end]?.name || "Product").slice(0, 120);
+      const rowHeight = Math.max(34, wrap(name, 40).length * 11 + 18);
+      if (end > start && height + rowHeight > maxItemHeight) break;
+      height += rowHeight;
+      end++;
+    }
+    pageRanges.push([start, end]);
+    start = end;
   }
+  if (!pageRanges.length) pageRanges.push([0, 0]);
+  const pageCount = pageRanges.length;
+  const streams = pageRanges.map(([pageStart, pageEnd], page) =>
+    renderPage({ order, customer, items, start: pageStart, end: pageEnd, page, pages: pageCount, last: page === pageCount - 1 })
+  );
   const objects = [];
   const pageIds = streams.map((_, i) => 4 + i * 2);
   const boldFontId = 4 + pageCount * 2;
