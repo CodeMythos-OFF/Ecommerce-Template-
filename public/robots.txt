@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://testsampleindev.vercel.app/sitemap.xml
