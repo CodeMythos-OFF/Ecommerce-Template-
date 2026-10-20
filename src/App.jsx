@@ -50,6 +50,13 @@ const getProductRouteId = (hash = window.location.hash) => {
 
 const resolveRoute = (hash) => getProductRouteId(hash) ? "pdetails" : (ROUTES[hash] || "home");
 
+const escapeHtml = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
 const getBrandName = (product) => {
   return (product.brand || product.sellerBusinessName || product.sellerName || "").trim();
 };
@@ -799,7 +806,7 @@ function App() {
               <label class="form-label fw-bold">Select Saved Address</label>
               <select id="swal-address-select" class="form-select">
                 <option value="">-- Or Enter New Address --</option>
-                ${savedAddresses.map((addr) => `<option value="${addr.id}">${addr.name || "Address"} - ${addr.street}, ${addr.city}</option>`).join("")}
+                ${savedAddresses.map((addr) => `<option value="${addr.id}">${escapeHtml(addr.name || "Address")} - ${escapeHtml(addr.street || "")}, ${escapeHtml(addr.city || "")}</option>`).join("")}
               </select>
             </div>` : ""}
           <div class="p-3 mb-3 rounded-3" style="background:#f0f8ff;border:1px solid #cfe8ff">
