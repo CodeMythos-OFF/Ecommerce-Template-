@@ -26,11 +26,18 @@ const SUPER_ADMIN_DELETE_PIN = process.env.SUPER_ADMIN_DELETE_PIN;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
+const DEFAULT_PRODUCTION_ORIGINS = ['https://testsampleindev.vercel.app'];
+const CONFIGURED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const DEVELOPMENT_ORIGINS = process.env.NODE_ENV === 'production'
+  ? []
+  : ['http://localhost:5173', 'http://localhost:3000'];
 const ALLOWED_ORIGINS = new Set([
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://scs577738.vercel.app',
-  'https://testsampleindev.vercel.app'
+  ...DEFAULT_PRODUCTION_ORIGINS,
+  ...CONFIGURED_ORIGINS,
+  ...DEVELOPMENT_ORIGINS
 ]);
 
 app.use((req, res, next) => {
