@@ -42,7 +42,12 @@ const ROUTES = {
   "#wishlist": "wishlist",
 };
 
-const resolveRoute = (hash) => ROUTES[hash] || "home";
+const getProductRouteId = (hash = window.location.hash) => {
+  const match = String(hash || "").match(/^#product-([a-f0-9]{24})$/i);
+  return match ? match[1] : null;
+};
+
+const resolveRoute = (hash) => getProductRouteId(hash) ? "pdetails" : (ROUTES[hash] || "home");
 
 const getBrandName = (product) => {
   return (product.brand || product.sellerBusinessName || product.sellerName || "").trim();
@@ -411,6 +416,23 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const syncProductFromUrl = () => {
+      const routeId = getProductRouteId();
+      if (!routeId) return;
+      const product = products.find((item) => String(item._id || "").toLowerCase() === routeId.toLowerCase());
+      if (product) {
+        setSelectedProduct(product);
+      } else if (!productsLoading && products.length > 0) {
+        setSelectedProduct(null);
+      }
+    };
+
+    syncProductFromUrl();
+    window.addEventListener("hashchange", syncProductFromUrl);
+    return () => window.removeEventListener("hashchange", syncProductFromUrl);
+  }, [products, productsLoading]);
+
+  useEffect(() => {
     if (!authChecked) return;
     const enforceRoute = () => {
       const nextPage = resolveRoute(window.location.hash);
@@ -581,9 +603,18 @@ function App() {
       } catch (error) {
         console.warn("Could not save recently viewed product:", error);
       }
-      handlePageChange("pdetails");
+
+      // MongoDB's random ObjectId gives every product a stable, unique shareable URL.
+      const routeId = String(product._id || "");
+      if (routeId) {
+        window.location.hash = `#product-${routeId}`;
+      } else {
+        // Keep older/imported products usable if they do not have a MongoDB ObjectId.
+        window.location.hash = "#pdetails";
+      }
+      setActivePage("pdetails");
     },
-    [handlePageChange]
+    []
   );
 
   const handleAddToCart = useCallback(
