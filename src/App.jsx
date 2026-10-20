@@ -1859,16 +1859,6 @@ function App() {
               </div>
             </div>
           </div>
-          <section className="dashboard-legal-links mt-4" aria-label="ShopMaster information and policies">
-            <div className="dashboard-legal-copy">
-              <strong>ShopMaster</strong>
-              <span>© {new Date().getFullYear()} ShopMaster. All rights reserved.</span>
-            </div>
-            <div className="dashboard-legal-actions">
-              <button type="button" onClick={() => handlePageChange("privacy")}>Privacy Policy</button>
-              <button type="button" onClick={() => handlePageChange("terms")}>Terms of Service</button>
-            </div>
-          </section>
         </div>
       </div>
 
@@ -1891,16 +1881,6 @@ function App() {
       <div id="terms" className={`page ${activePage === "terms" ? "active" : ""}`}>
         <TermsOfService />
       </div>
-
-      <footer className="site-footer">
-        <div className="container d-flex flex-wrap justify-content-between align-items-center gap-3">
-          <div className="small">© {new Date().getFullYear()} ShopMaster. All rights reserved.</div>
-          <div className="d-flex gap-3">
-            <a href="#privacy" onClick={(e) => { e.preventDefault(); handlePageChange("privacy"); }}>Privacy Policy</a>
-            <a href="#terms" onClick={(e) => { e.preventDefault(); handlePageChange("terms"); }}>Terms of Service</a>
-          </div>
-        </div>
-      </footer>
 
       <div id="orderhistory" className={`page ${activePage === "orderhistory" ? "active" : ""}`}>
         {activePage === "orderhistory" && (
