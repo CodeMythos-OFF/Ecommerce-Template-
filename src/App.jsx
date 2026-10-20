@@ -1389,6 +1389,38 @@ function App() {
                     <button className="product-secondary-button" onClick={() => handlePageChange("Cart")}>
                       <i className="bi bi-bag"></i> View Cart
                     </button>
+                    <button
+                      type="button"
+                      className="product-secondary-button"
+                      onClick={async () => {
+                        const productUrl = product._id
+                          ? `${window.location.origin}${window.location.pathname}#product-${product._id}`
+                          : window.location.href;
+                        const shareTitle = `${product.id || "Product"} | ShopMaster`;
+                        const shareText = `Check out ${product.id || "this product"} on ShopMaster for ₹${Number(product.cost || 0).toLocaleString("en-IN")}.`;
+                        try {
+                          if (navigator.share) {
+                            await navigator.share({ title: shareTitle, text: shareText, url: productUrl });
+                          } else if (navigator.clipboard?.writeText) {
+                            await navigator.clipboard.writeText(productUrl);
+                            Swal.fire({ icon: "success", title: "Product link copied!", text: "Share the link with anyone.", timer: 1800, showConfirmButton: false });
+                          } else {
+                            window.prompt("Copy this product link:", productUrl);
+                          }
+                        } catch (error) {
+                          if (error?.name !== "AbortError") {
+                            try {
+                              await navigator.clipboard.writeText(productUrl);
+                              Swal.fire({ icon: "success", title: "Product link copied!", timer: 1800, showConfirmButton: false });
+                            } catch {
+                              window.prompt("Copy this product link:", productUrl);
+                            }
+                          }
+                        }
+                      }}
+                    >
+                      <i className="bi bi-share me-1"></i> Share Product
+                    </button>
                   </div>
 
                   <div className="product-trust-row">
