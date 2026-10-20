@@ -17,7 +17,7 @@ import { getWishlist, toggleWishlist } from "./wishlistService";
 import "./SellerApplication.css";
 import "./App.css";
 import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./cartService";
-import { trackView, createOrder, getProducts, validateCoupon } from "./api";
+import { trackView, createOrder, getProducts, getProductByMongoId, validateCoupon } from "./api";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
 import Swal from "sweetalert2";
 
@@ -416,20 +416,37 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const syncProductFromUrl = () => {
+    let cancelled = false;
+    const syncProductFromUrl = async () => {
       const routeId = getProductRouteId();
       if (!routeId) return;
       const product = products.find((item) => String(item._id || "").toLowerCase() === routeId.toLowerCase());
       if (product) {
         setSelectedProduct(product);
-      } else if (!productsLoading && products.length > 0) {
-        setSelectedProduct(null);
+        return;
+      }
+
+      // Fetch just the requested product in parallel with the full catalog request.
+      // This lets shared/direct product links render without waiting for every product.
+      try {
+        const directProduct = await getProductByMongoId(routeId);
+        if (!cancelled && directProduct && getProductRouteId() === routeId) {
+          setSelectedProduct(directProduct);
+        } else if (!cancelled && !directProduct && !productsLoading) {
+          setSelectedProduct(null);
+        }
+      } catch (error) {
+        console.warn("Could not load shared product directly:", error);
+        if (!cancelled && !productsLoading && products.length > 0) setSelectedProduct(null);
       }
     };
 
     syncProductFromUrl();
     window.addEventListener("hashchange", syncProductFromUrl);
-    return () => window.removeEventListener("hashchange", syncProductFromUrl);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("hashchange", syncProductFromUrl);
+    };
   }, [products, productsLoading]);
 
   useEffect(() => {
