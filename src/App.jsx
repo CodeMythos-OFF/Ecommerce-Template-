@@ -1056,7 +1056,7 @@ function App() {
       />
 
       <div id="admin" className={`page ${activePage === "admin" ? "active" : ""}`}>
-        {hasAdminAccess ? (
+        {activePage === "admin" && hasAdminAccess ? (
           <AdminPanel currentUser={currentUser} />
         ) : (
           <div className="container py-5">
@@ -1553,7 +1553,7 @@ function App() {
       </div>
 
       <div id="reviews" className={`page ${activePage === "reviews" ? "active" : ""}`}>
-        {selectedProduct ? (
+        {activePage === "reviews" && selectedProduct ? (
           <ProductReviews product={selectedProduct} currentUser={currentUser} />
         ) : (
           <div className="container py-5">
@@ -1646,7 +1646,7 @@ function App() {
                   <h2 className="card-title mb-3">Sign In to ShopMaster</h2>
                   <p className="text-muted mb-4">Choose your preferred sign-in method</p>
                   <div className="d-flex justify-content-center mb-4">
-                    <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />
+                    {activePage === "login" && {activePage === "orderhistory" && <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />}}
                   </div>
                   <div className="mt-4">
                     <p className="small text-muted">
@@ -1745,7 +1745,7 @@ function App() {
       </div>
 
       <div id="account" className={`page ${activePage === "account" ? "active" : ""}`}>
-        {currentUser ? <CustomerAccount currentUser={currentUser} onPageChange={handlePageChange} /> : (
+        {activePage === "account" && currentUser ? <CustomerAccount currentUser={currentUser} onPageChange={handlePageChange} /> : (
           <div className="container py-5 text-center"><div className="card p-5"><h2>Sign in to view your account</h2><button className="btn btn-primary mt-3" onClick={() => handlePageChange("login")}>Sign In</button></div></div>
         )}
       </div>
@@ -1873,15 +1873,15 @@ function App() {
       </div>
 
       <div id="wishlist" className={`page ${activePage === "wishlist" ? "active" : ""}`}>
-        <Wishlist currentUser={currentUser} products={products} onShowDetails={showProductDetails} onAddCart={handleAddToCart} />
+        {activePage === "wishlist" && <Wishlist currentUser={currentUser} products={products} onShowDetails={showProductDetails} onAddCart={handleAddToCart} />}
       </div>
 
-      <div id="sellerdashboard" className={`page ${activePage === "sellerdashboard" ? "active" : ""}`}><SellerDashboard currentUser={currentUser} /></div>
+      <div id="sellerdashboard" className={`page ${activePage === "sellerdashboard" ? "active" : ""}`}>{activePage === "sellerdashboard" && <SellerDashboard currentUser={currentUser} />}</div>
 
-      <div id="storefront" className={`page ${activePage === "storefront" ? "active" : ""}`}><SellerStorefront email={selectedStoreEmail} onShowDetails={showProductDetails} /></div>
+      <div id="storefront" className={`page ${activePage === "storefront" ? "active" : ""}`}>{activePage === "storefront" && <SellerStorefront email={selectedStoreEmail} onShowDetails={showProductDetails} />}</div>
 
       <div id="sellerapply" className={`page ${activePage === "sellerapply" ? "active" : ""}`}>
-        <SellerApplication currentUser={currentUser} />
+        {activePage === "sellerapply" && <SellerApplication currentUser={currentUser} />}
       </div>
 
       <div id="privacy" className={`page ${activePage === "privacy" ? "active" : ""}`}>
@@ -1904,7 +1904,7 @@ function App() {
 
       <div id="orderhistory" className={`page ${activePage === "orderhistory" ? "active" : ""}`}>
         {currentUser ? (
-          <OrderHistory currentUser={currentUser} />
+          {activePage === "orderhistory" && <OrderHistory currentUser={currentUser} />}
         ) : (
           <div className="container my-5">
             <div className="text-center">
