@@ -1961,8 +1961,12 @@ app.post('/api/orders', async (req, res) => {
       address
       });
     } catch (orderCreateError) {
-      for (const item of reserved) {
-        await Product.updateOne({ id: item.name, sellerEmail: item.sellerEmail }, { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }).catch(() => {});
+      // A duplicate-key error is handled by the outer idempotency recovery block.
+      // Avoid restoring stock here so it is restored exactly once there.
+      if (orderCreateError?.code !== 11000) {
+        for (const item of reserved) {
+          await Product.updateOne({ id: item.name, sellerEmail: item.sellerEmail }, { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }).catch(() => {});
+        }
       }
       throw orderCreateError;
     }
@@ -1983,7 +1987,18 @@ app.post('/api/orders', async (req, res) => {
   } catch (error) {
     if (error?.code === 11000) {
       const key = String(req.get('Idempotency-Key') || '').trim();
-      if (key) { const existingOrder = await Order.findOne({ idempotencyKey: key }).catch(() => null); if (existingOrder) return res.status(200).json({ order: existingOrder, message: 'Order already created' }); }
+      if (key) {
+        const existingOrder = await Order.findOne({ idempotencyKey: key }).catch(() => null);
+        if (existingOrder) {
+          for (const item of reserved) {
+            await Product.updateOne(
+              { id: item.name, sellerEmail: item.sellerEmail },
+              { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }
+            ).catch(() => {});
+          }
+          return res.status(200).json({ order: existingOrder, message: 'Order already created' });
+        }
+      }
     }
     console.error('Create order error:', error.message);
     res.status(500).json({ error: 'Internal server error' });
