@@ -1646,7 +1646,7 @@ function App() {
                   <h2 className="card-title mb-3">Sign In to ShopMaster</h2>
                   <p className="text-muted mb-4">Choose your preferred sign-in method</p>
                   <div className="d-flex justify-content-center mb-4">
-                    {activePage === "login" && {activePage === "orderhistory" && <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />}}
+                    {activePage === "login" && <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />}
                   </div>
                   <div className="mt-4">
                     <p className="small text-muted">
@@ -1909,7 +1909,7 @@ function App() {
           <div className="container my-5">
             <div className="text-center">
               <h2>Please sign in to view your order history</h2>
-              <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />
+              {activePage === "orderhistory" && <Auth isAuthenticated={Boolean(currentUser)} onSignInSuccess={handleSignInSuccess} onSignInFailure={handleSignInFailure} />}
             </div>
           </div>
         )}
