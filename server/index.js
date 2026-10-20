@@ -313,6 +313,8 @@ const productSchema = new mongoose.Schema({
 });
 
 productSchema.index({ id: 1, sellerEmail: 1 }, { unique: true });
+productSchema.index({ isActive: 1, createdAt: -1 });
+productSchema.index({ sellerEmail: 1, isActive: 1, createdAt: -1 });
 
 const Product = mongoose.model('Product', productSchema);
 
@@ -1175,12 +1177,15 @@ app.get('/api/products', async (req, res) => {
   try {
     const { sellerEmail } = req.query;
     const filter = { isActive: true };
-    
+
     if (sellerEmail) {
       filter.sellerEmail = sellerEmail;
     }
-    
-    const products = await Product.find(filter).sort({ createdAt: -1 }).maxTimeMS(5000);
+
+    // The public catalog changes infrequently compared with how often it is read.
+    // A short browser/CDN cache makes repeat visits much faster without hiding updates for long.
+    res.set('Cache-Control', 'public, max-age=20, stale-while-revalidate=60');
+    const products = await Product.find(filter).sort({ createdAt: -1 }).lean().maxTimeMS(5000);
     res.json(products);
   } catch (error) {
     console.error('Get products error:', error);
