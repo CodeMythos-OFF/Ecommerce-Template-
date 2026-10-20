@@ -8,7 +8,10 @@ export default defineConfig({
     // Configure middleware to handle SPA routing
     middlewareMode: false,
   },
-  preview: {
-    // For production preview
+  build: {
+    // Keep production JavaScript and CSS minified and omit source maps.
+    minify: 'esbuild',
+    cssMinify: true,
+    sourcemap: false,
   },
 })
