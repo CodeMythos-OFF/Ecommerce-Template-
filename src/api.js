@@ -181,6 +181,15 @@ export const deleteOrder = async (orderId, pin = '') => {
   }
 };
 
+export const getProductByMongoId = async (productId) => {
+  if (!/^[a-f0-9]{24}$/i.test(String(productId || ""))) return null;
+  const response = await fetchWithRetry(`${API_URL}/products/by-id/${encodeURIComponent(productId)}`, { cache: 'no-store' });
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(data.error || 'Failed to get product');
+  return data;
+};
+
 export const getProducts = async (sellerEmail = null) => {
   let url = `${API_URL}/products`;
   if (sellerEmail) url += `?sellerEmail=${encodeURIComponent(sellerEmail)}`;
