@@ -74,53 +74,47 @@ const AdminPanel = ({ currentUser }) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const isOnline = await checkBackendHealth();
-      setBackendOnline(isOnline);
-
-      try {
-        const sellerEmail = currentUser?.isSuperAdmin ? null : currentUser?.email;
-        const [statsData, ordersData, productsData] = await Promise.all([
-          getStats(sellerEmail),
-          getOrders(50, sellerEmail),
-          getProducts(sellerEmail)
-        ]);
-
-        if (currentUser?.isSuperAdmin) {
-          const sellersData = await getAllSellers();
-          setSellers(Array.isArray(sellersData) ? sellersData : []);
-        } else {
-          setSellers([]);
-        }setStats(statsData || {});
-        setOrders(Array.isArray(ordersData) ? ordersData : []);
-        setProducts(Array.isArray(productsData) ? productsData : []);
-      } catch (apiError) {
-        console.error('Error loading from API:', apiError);
-        setStats({});
-        setOrders([]);
-        setProducts([]);
-      }
-
+      // Health status must not block the primary dashboard requests.
+      const healthPromise = checkBackendHealth().then(setBackendOnline).catch(() => setBackendOnline(false));
+      const sellerEmail = currentUser?.isSuperAdmin ? null : currentUser?.email;
+      const [statsData, ordersData, productsData] = await Promise.all([
+        getStats(sellerEmail),
+        getOrders(50, sellerEmail),
+        getProducts(sellerEmail)
+      ]);
+      setStats(statsData || {});
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setProducts(Array.isArray(productsData) ? productsData : []);
+      // Render the main panel as soon as its core data is ready. Super-admin
+      // configuration data loads in the background and does not delay navigation.
+      setLoading(false);
+      const backgroundTasks = [healthPromise];
       if (currentUser?.isSuperAdmin) {
-        try {
-          const couponData = await getCoupons();
-          setCoupons(Array.isArray(couponData) ? couponData : []);
-        } catch (couponError) {
-          console.warn('Coupon settings unavailable:', couponError);
-          setCoupons([]);
-        }
-        try {
-          const [status, templates] = await Promise.all([getMicrosoftEmailStatus(), getMicrosoftEmailTemplates()]);
-          setEmailStatus(status || {});
-          setEmailTemplates(Array.isArray(templates) ? templates : []);
-        } catch (emailError) {
-          console.warn('Microsoft email settings unavailable:', emailError);
-        }
+        backgroundTasks.push(
+          getAllSellers().then(data => setSellers(Array.isArray(data) ? data : [])).catch(error => {
+            console.warn('Seller list unavailable:', error);
+            setSellers([]);
+          }),
+          getCoupons().then(data => setCoupons(Array.isArray(data) ? data : [])).catch(error => {
+            console.warn('Coupon settings unavailable:', error);
+            setCoupons([]);
+          }),
+          Promise.all([getMicrosoftEmailStatus(), getMicrosoftEmailTemplates()]).then(([status, templates]) => {
+            setEmailStatus(status || {});
+            setEmailTemplates(Array.isArray(templates) ? templates : []);
+          }).catch(error => console.warn('Microsoft email settings unavailable:', error))
+        );
+      } else {
+        setSellers([]);
       }
-
+      await Promise.allSettled(backgroundTasks);
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Error loading admin data:', error);
       setBackendOnline(false);
+      setStats({});
+      setOrders([]);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
