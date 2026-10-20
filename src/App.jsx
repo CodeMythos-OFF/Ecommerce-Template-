@@ -296,7 +296,6 @@ function App() {
   const [discountOnly, setDiscountOnly] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedStoreEmail, setSelectedStoreEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const hasAdminAccess = isAdmin || currentUser?.isAdmin === true || currentUser?.isSuperAdmin === true || currentUser?.email?.toLowerCase() === "codemythos@outlook.com";
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -373,9 +372,6 @@ function App() {
     restoreSession();
     loadProducts();
     trackView();
-    const loadingTimer = setTimeout(() => {
-      setIsLoading(false);
-    }, 3600);
     const handleProductsUpdated = () => {
       loadProducts();
     };
@@ -384,7 +380,6 @@ function App() {
       cancelled = true;
       controller.abort();
       clearTimeout(timeoutId);
-      clearTimeout(loadingTimer);
       window.removeEventListener("productsUpdated", handleProductsUpdated);
     };
   }, [loadProducts]);
@@ -1002,10 +997,6 @@ function App() {
     },
     [products]
   );
-
-  if (isLoading) {
-    return <BootScreen />;
-  }
 
   const hasActiveFilters =
     selectedCategories.length > 0 ||
