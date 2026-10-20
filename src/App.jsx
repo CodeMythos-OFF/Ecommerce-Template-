@@ -1859,6 +1859,16 @@ function App() {
               </div>
             </div>
           </div>
+          <section className="dashboard-legal-links mt-4" aria-label="ShopMaster information and policies">
+            <div className="dashboard-legal-copy">
+              <strong>ShopMaster</strong>
+              <span>© {new Date().getFullYear()} ShopMaster. All rights reserved.</span>
+            </div>
+            <div className="dashboard-legal-actions">
+              <button type="button" onClick={() => handlePageChange("privacy")}>Privacy Policy</button>
+              <button type="button" onClick={() => handlePageChange("terms")}>Terms of Service</button>
+            </div>
+          </section>
         </div>
       </div>
 
