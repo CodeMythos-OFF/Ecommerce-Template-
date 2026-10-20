@@ -17,6 +17,7 @@ export default function SellerDashboard({ currentUser }) {
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({});
   const [reviews, setReviews] = useState([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [drafts, setDrafts] = useState({});
   const [profile, setProfile] = useState({ name: "", businessName: "", phone: "", address: "" });
   const [search, setSearch] = useState("");
@@ -29,7 +30,9 @@ export default function SellerDashboard({ currentUser }) {
 
   const load = useCallback(async () => {
     if (!currentUser?.email) { setLoading(false); return; }
-    setLoading(true); setError("");
+    // Keep the existing dashboard visible during refreshes; the initial loading state
+    // already covers the first visit.
+    setError("");
     try {
       const results = await Promise.all([
         fetch(API_URL + "/sellers/" + encodeURIComponent(currentUser.email) + "/products", { headers: authHeaders() }),
@@ -44,19 +47,35 @@ export default function SellerDashboard({ currentUser }) {
       setProducts(safeProducts); setStats(results[1] || {}); setOrders(safeOrders);
       setDrafts(Object.fromEntries(safeProducts.map(p => [p._id || p.id, { stock: String(p.stock ?? 0), isActive: p.isActive !== false }])));
       setProfile({ name: currentUser.sellerName || currentUser.name || "", businessName: currentUser.sellerBusinessName || "", phone: currentUser.sellerPhone || "", address: currentUser.sellerAddress || "" });
-      const reviewResults = await Promise.all(safeProducts.slice(0, 30).map(async p => {
-        try {
-          const response = await fetch(API_URL + "/reviews/product/" + encodeURIComponent(p.id));
-          const data = await response.json();
-          return (data.reviews || []).map(review => ({ ...review, productId: p.id }));
-        } catch { return []; }
-      }));
-      setReviews(reviewResults.flat().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (e) { setError(e.message || "Could not load seller dashboard"); }
     finally { setLoading(false); }
   }, [currentUser]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Reviews are secondary data: fetch them only when the seller opens the Reviews tab.
+  useEffect(() => {
+    if (tab !== "Reviews" || !currentUser?.email || products.length === 0) return;
+    let cancelled = false;
+    const loadReviews = async () => {
+      setReviewLoading(true);
+      try {
+        const reviewResults = await Promise.all(products.slice(0, 30).map(async product => {
+          try {
+            const response = await fetch(API_URL + "/reviews/product/" + encodeURIComponent(product.id));
+            if (!response.ok) return [];
+            const data = await response.json();
+            return (data.reviews || []).map(review => ({ ...review, productId: product.id }));
+          } catch { return []; }
+        }));
+        if (!cancelled) setReviews(reviewResults.flat().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      } finally {
+        if (!cancelled) setReviewLoading(false);
+      }
+    };
+    loadReviews();
+    return () => { cancelled = true; };
+  }, [tab, currentUser?.email, products]);
 
   // Cancelled orders must not inflate sales, earnings, product performance, or customer spend.
   const sellerItems = useMemo(() => orders
@@ -143,7 +162,7 @@ export default function SellerDashboard({ currentUser }) {
     {tab==="Products" && <Panel title="Product performance" subtitle="Search and review your own listings"><input className="form-control mb-3" placeholder="Search product, category or brand…" value={search} onChange={e=>setSearch(e.target.value)}/><ProductTable/></Panel>}
     {tab==="Inventory" && <Panel title="Inventory management" subtitle="Update available stock and publish or hide your own listings"><ProductTable inventory/></Panel>}
     {tab==="Customers" && <Panel title="Your customers" subtitle="Customer information derived from orders containing your products">{customers.length?<div className="table-responsive"><table className="table seller-table"><thead><tr><th>Customer</th><th>Orders</th><th>Product spend</th><th>Last order</th></tr></thead><tbody>{customers.map(c=><tr key={c.email}><td><strong>{c.name}</strong><div className="small seller-muted">{c.email}</div></td><td>{c.orders}</td><td>{money(c.spent)}</td><td>{dateLabel(c.lastOrder)}</td></tr>)}</tbody></table></div>:<div className="seller-empty">Customer details will appear after your first order.</div>}</Panel>}
-    {tab==="Reviews" && <Panel title="Product reviews" subtitle="Reviews for your listings">{reviews.length?<div className="d-grid gap-3">{reviews.map((review,index)=><article className="border rounded-3 p-3" key={review._id||review.productId+"-"+index}><div className="d-flex flex-wrap justify-content-between gap-2"><div><strong>{review.productId}</strong><div className="small seller-muted">By {review.userName||"Customer"} · {dateLabel(review.createdAt)}</div></div><span className="badge bg-warning-subtle text-warning-emphasis">★ {review.rating}/5</span></div>{review.comment&&<p className="mb-0 mt-2">{review.comment}</p>}</article>)}</div>:<div className="seller-empty">No reviews for your products yet.</div>}</Panel>}
+    {tab==="Reviews" && <Panel title="Product reviews" subtitle="Reviews for your listings">{reviewLoading?<div className="seller-empty">Loading reviews…</div>:reviews.length?<div className="d-grid gap-3">{reviews.map((review,index)=><article className="border rounded-3 p-3" key={review._id||review.productId+"-"+index}><div className="d-flex flex-wrap justify-content-between gap-2"><div><strong>{review.productId}</strong><div className="small seller-muted">By {review.userName||"Customer"} · {dateLabel(review.createdAt)}</div></div><span className="badge bg-warning-subtle text-warning-emphasis">★ {review.rating}/5</span></div>{review.comment&&<p className="mb-0 mt-2">{review.comment}</p>}</article>)}</div>:<div className="seller-empty">No reviews for your products yet.</div>}</Panel>}
     {tab==="Earnings" && <><div className="alert alert-info">This is an estimate of product-line sales, not a payout balance. ShopMaster currently supports Cash on Delivery only.</div><Panel title="Recent product sales"><div className="table-responsive"><table className="table seller-table"><thead><tr><th>Order</th><th>Product</th><th>Qty</th><th>Line total</th><th>Date</th></tr></thead><tbody>{sellerItems.slice().sort((a,b)=>new Date(b.orderDate)-new Date(a.orderDate)).slice(0,100).map((item,index)=><tr key={item.orderId+"-"+item.name+"-"+index}><td>{item.orderId}</td><td>{item.name}</td><td>{item.quantity}</td><td>{money(Number(item.price||0)*Number(item.quantity||0))}</td><td>{dateLabel(item.orderDate)}</td></tr>)}</tbody></table></div></Panel></>}
     {tab==="Settings" && <Panel title="Seller profile" subtitle="Update your seller contact and storefront information"><form onSubmit={saveProfile} className="row g-3"><div className="col-md-6"><label className="form-label">Seller name</label><input className="form-control" maxLength="160" required value={profile.name} onChange={e=>setProfile(p=>({...p,name:e.target.value}))}/></div><div className="col-md-6"><label className="form-label">Business / brand name</label><input className="form-control" maxLength="160" required value={profile.businessName} onChange={e=>setProfile(p=>({...p,businessName:e.target.value}))}/></div><div className="col-md-6"><label className="form-label">Contact phone</label><input className="form-control" maxLength="40" value={profile.phone} onChange={e=>setProfile(p=>({...p,phone:e.target.value}))}/></div><div className="col-12"><label className="form-label">Business address</label><textarea className="form-control" rows="3" maxLength="500" value={profile.address} onChange={e=>setProfile(p=>({...p,address:e.target.value}))}/></div><div className="col-12"><button className="btn btn-primary" disabled={savingProfile}>{savingProfile?"Saving…":"Save profile"}</button><div className="small seller-muted mt-2">Signed in as {currentUser.email}</div></div></form></Panel>}
   </main>;
