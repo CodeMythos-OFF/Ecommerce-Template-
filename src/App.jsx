@@ -19,6 +19,7 @@ import "./App.css";
 import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./cartService";
 import { trackView, createOrder, getProducts, getProductByMongoId, validateCoupon } from "./api";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
+import { downloadInvoice } from "./invoice";
 import Swal from "sweetalert2";
 
 const AUTH_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
@@ -951,12 +952,18 @@ function App() {
         }
       };
 
-      await createOrder(orderData);
+      const createdOrderResponse = await createOrder(orderData);
+      const savedOrder = createdOrderResponse?.order || createdOrderResponse;
+      try {
+        downloadInvoice(savedOrder, { name: currentUser.name || orderData.userName, email: currentUser.email });
+      } catch (invoiceError) {
+        console.error("Order placed, but invoice download failed:", invoiceError);
+      }
 
       Swal.fire({
         icon: "success",
         title: "Order Placed!",
-        html: `<p>Your order of <strong>₹${finalTotal}</strong> has been placed successfully!</p>
+        html: `<p>Your order of <strong>₹${finalTotal}</strong> has been placed successfully!</p><p class="small text-success mb-0"><i class="bi bi-file-earmark-pdf me-1"></i>Your invoice PDF download has started. You can download it again from Your Orders.</p>
           <div class="text-start mt-3 p-3" style="background:#f8f9fa;border-radius:8px">
             <div class="d-flex justify-content-between small"><span>Subtotal:</span><span>₹${subtotal}</span></div>
             ${finalDiscount > 0 ? `<div class="d-flex justify-content-between small text-success"><span>Coupon (${appliedCoupon?.code}):</span><span>-₹${finalDiscount}</span></div>` : ""}
