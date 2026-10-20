@@ -1208,6 +1208,21 @@ app.get('/api/sellers/:email/products', async (req, res) => {
   }
 });
 
+app.get('/api/products/by-id/:id', async (req, res) => {
+  try {
+    if (!/^[a-f0-9]{24}$/i.test(String(req.params.id || ''))) {
+      return res.status(400).json({ error: 'Invalid product ID' });
+    }
+    const product = await Product.findOne({ _id: req.params.id, isActive: true }).lean().maxTimeMS(5000);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    res.set('Cache-Control', 'public, max-age=20, stale-while-revalidate=60');
+    return res.json(product);
+  } catch (error) {
+    console.error('Get product by Mongo ID error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/products/:id', async (req, res) => {
   try {
     const product = await Product.findOne({ id: req.params.id, isActive: true }).maxTimeMS(5000);
