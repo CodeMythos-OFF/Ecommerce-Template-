@@ -958,12 +958,15 @@ function App() {
       setCurrentUser(userData);
       setIsAdmin(userData.isAdmin === true);
       setCartItems(getCart(userData.email));
+      setWishlistItems(getWishlist(userData.email));
 
-      // Always return to the home page after a successful sign-in.
-      window.location.hash = "#home";
-      setActivePage("home");
-
-      // Sign in silently and return to the home page without a success popup.
+      // Auth also restores an existing cookie session on mount. Preserve the
+      // visitor's current page in that case; only navigate home when the user
+      // was on the sign-in page and authentication has now completed.
+      if (window.location.hash === "#login") {
+        window.location.hash = "#home";
+        setActivePage("home");
+      }
     },
     []
   );
