@@ -34,7 +34,10 @@ const DEFAULT_ALLOWED_ORIGINS = [
 ];
 const configuredFrontendOrigins = String(process.env.FRONTEND_ORIGINS || '')
   .split(',')
-  .map((origin) => origin.trim().replace(/\\/$/, ''))
+  .map((origin) => {
+    const normalized = origin.trim();
+    return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+  })
   .filter(Boolean);
 const ALLOWED_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredFrontendOrigins]);
 
