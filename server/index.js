@@ -737,11 +737,14 @@ app.use('/api', async (req, res, next) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const ready = isConnected && mongoose.connection.readyState === 1;
+  const databaseReady = isConnected && mongoose.connection.readyState === 1;
+  const sessionConfigReady = Boolean(AUTH_SESSION_SECRET && AUTH_SESSION_SECRET.length >= 32);
+  const ready = databaseReady && sessionConfigReady;
   return res.status(ready ? 200 : 503).json({
     status: ready ? 'ok' : 'not_ready',
-    message: ready ? 'Server and database are ready' : 'Database is not ready',
-    database: ready ? 'connected' : 'disconnected',
+    message: ready ? 'Server is ready' : 'Required production configuration is not ready',
+    database: databaseReady ? 'connected' : 'disconnected',
+    sessionConfig: sessionConfigReady ? 'configured' : 'missing_or_invalid',
   });
 });
 
