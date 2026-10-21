@@ -18,11 +18,11 @@ import "./SellerApplication.css";
 import "./App.css";
 import { getCart, saveCart, addToCart, removeFromCart, getCurrentUser } from "./cartService";
 import { trackView, createOrder, getProducts, getProductByMongoId, validateCoupon } from "./api";
+import { API_URL } from "./apiConfig";
 import { getAddresses, addAddress, deleteAddress, getLocationAddress } from "./addressService";
 import { downloadInvoice } from "./invoice";
 import Swal from "sweetalert2";
 
-const AUTH_API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
 const ROUTES = {
   "#dashboard": "dashboard",
@@ -336,7 +336,7 @@ function App() {
       try {
         // The server-side HttpOnly cookie is the source of truth after a refresh.
         // Do not rely only on sessionStorage, because browser/session state can be cleared.
-        const response = await fetch(`${AUTH_API_URL}/auth/me`, {
+        const response = await fetch(`${API_URL}/auth/me`, {
           method: "GET",
           credentials: "include",
           cache: "no-store",
@@ -1022,7 +1022,7 @@ function App() {
       if (!result.isConfirmed) return;
 
       try {
-        await fetch(AUTH_API_URL + "/auth/logout", {
+        await fetch(API_URL + "/auth/logout", {
           method: "POST",
           credentials: "include",
         });

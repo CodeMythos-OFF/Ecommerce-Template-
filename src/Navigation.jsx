@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import "./Navigation.css";
 import { getCurrentUser } from "./cartService";
-const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+import { API_URL } from "./apiConfig";
 import Swal from 'sweetalert2';
 
 const NAV_ICONS = { home: '🏠', products: '🛍️', cart: '🛒', user: '👤', login: '🔓' };

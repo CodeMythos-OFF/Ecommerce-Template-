@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './GoogleAuth.css';
 import GoogleAuthService from './services/GoogleAuthService';
 
-const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+import { API_URL } from './apiConfig';
 
 const Auth = ({ onSignInSuccess, onSignInFailure, isAuthenticated }) => {
   const [isSignedIn, setIsSignedIn] = useState(false);
