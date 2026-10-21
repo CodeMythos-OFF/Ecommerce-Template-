@@ -26,20 +26,12 @@ const SUPER_ADMIN_DELETE_PIN = process.env.SUPER_ADMIN_DELETE_PIN;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware
-const DEFAULT_ALLOWED_ORIGINS = [
+const ALLOWED_ORIGINS = new Set([
   'http://localhost:5173',
   'http://localhost:3000',
   'https://scs577738.vercel.app',
   'https://testsampleindev.vercel.app'
-];
-const configuredFrontendOrigins = String(process.env.FRONTEND_ORIGINS || '')
-  .split(',')
-  .map((origin) => {
-    const normalized = origin.trim();
-    return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  })
-  .filter(Boolean);
-const ALLOWED_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredFrontendOrigins]);
+]);
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -739,15 +731,10 @@ app.use('/api', async (req, res, next) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.set('Cache-Control', 'no-store');
-  const databaseReady = isConnected && mongoose.connection.readyState === 1;
-  const sessionConfigReady = Boolean(AUTH_SESSION_SECRET && AUTH_SESSION_SECRET.length >= 32);
-  const ready = databaseReady && sessionConfigReady;
-  return res.status(ready ? 200 : 503).json({
-    status: ready ? 'ok' : 'not_ready',
-    message: ready ? 'Server is ready' : 'Required production configuration is not ready',
-    database: databaseReady ? 'connected' : 'disconnected',
-    sessionConfig: sessionConfigReady ? 'configured' : 'missing_or_invalid',
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    database: isConnected ? 'connected' : 'connecting...',
   });
 });
 

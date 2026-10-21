@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Generate backend lockfile when the repository does not include one
+      - name: Generate backend lockfile
         run: npm install --package-lock-only --ignore-scripts
       - run: npm ci --ignore-scripts
       - name: Check backend dependencies

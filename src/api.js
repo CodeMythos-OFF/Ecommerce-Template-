@@ -1,14 +1,12 @@
-import { API_URL } from './apiConfig';
+// API configuration
+const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
-// Retry only safe requests. Retrying mutations after a network failure can duplicate
-// orders, inventory changes, or other writes when the server completed the first request.
+// Retry helper
 const fetchWithRetry = async (url, options = {}, retries = 2) => {
-  const method = String(options.method || 'GET').toUpperCase();
-  const canRetry = method === 'GET' || method === 'HEAD';
   try {
     return await fetch(url, { credentials: 'include', ...options });
   } catch (error) {
-    if (canRetry && retries > 0) {
+    if (retries > 0) {
       console.warn(`Retry attempt ${3 - retries} for ${url}`);
       await new Promise(resolve => setTimeout(resolve, 1000));
       return fetchWithRetry(url, options, retries - 1);
@@ -39,13 +37,7 @@ export const trackView = async () => {
     return await response.json();
   } catch (error) {
     console.error('Error tracking view:', error.message);
-    let stats = {};
-    try {
-      stats = JSON.parse(localStorage.getItem('adminStats') || '{}');
-      if (!stats || typeof stats !== 'object' || Array.isArray(stats)) stats = {};
-    } catch {
-      // Recover cleanly if browser-local analytics data is malformed.
-    }
+    const stats = JSON.parse(localStorage.getItem('adminStats') || '{}');
     const today = new Date().toLocaleDateString();
 
     if (!stats.lastViewDate || stats.lastViewDate !== today) {
