@@ -731,10 +731,12 @@ app.use('/api', async (req, res, next) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'Server is running',
-    database: isConnected ? 'connected' : 'connecting...',
+  res.set('Cache-Control', 'no-store');
+  const ready = isConnected && mongoose.connection.readyState === 1;
+  return res.status(ready ? 200 : 503).json({
+    status: ready ? 'ok' : 'not_ready',
+    message: ready ? 'Server and database are ready' : 'Database is not ready',
+    database: ready ? 'connected' : 'disconnected',
   });
 });
 
