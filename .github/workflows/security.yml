@@ -8,19 +8,34 @@ on:
     - cron: "23 5 * * 1"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - name: Generate frontend lockfile when the repository does not include one
         run: npm install --package-lock-only --ignore-scripts
+      - name: Refresh compatible frontend dependency versions on same-repository PRs
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: npm audit fix --package-lock-only --ignore-scripts || true
+      - name: Commit refreshed frontend lockfile on the PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh frontend dependency lockfile"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          fi
       - run: npm ci
       - name: Check frontend dependencies
         run: npm audit --audit-level=high
@@ -28,17 +43,33 @@ jobs:
         run: npm run build
 
   backend:
+    needs: frontend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Generate backend lockfile
         run: npm install --package-lock-only --ignore-scripts
+      - name: Refresh compatible backend dependency versions on same-repository PRs
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: npm audit fix --package-lock-only --ignore-scripts || true
+      - name: Commit refreshed backend lockfile on the PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh backend dependency lockfile"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          fi
       - run: npm ci --ignore-scripts
       - name: Check backend dependencies
         run: npm audit --audit-level=high
